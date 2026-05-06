@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>洛克王国 · 蛋组查询器 + 种公匹配</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .stud-list {
+            margin-top: 1.5rem;
+            background: #fef7e0;
+            border-radius: 28px;
+            padding: 1rem 1.8rem;
+            border-left: 6px solid #f5b642;
+        }
+        .stud-item {
+            display: inline-block;
+            background: #fff0cc;
+            border-radius: 40px;
+            padding: 6px 18px;
+            margin: 6px 8px;
+            cursor: pointer;
+            transition: 0.1s;
+            font-weight: 500;
+            color: #b45f06;
+            border: 1px solid #f5d48a;
+        }
+        .stud-item:hover {
+            background: #ffe0a3;
+            transform: scale(1.02);
+        }
+        .stud-count {
+            background: #e6c87a;
+            border-radius: 30px;
+            padding: 2px 10px;
+            font-size: 0.7rem;
+            margin-left: 8px;
+            font-weight: bold;
+            color: #4a2e00;
+        }
+        .common-groups {
+            font-size: 0.7rem;
+            background: #fbe5b9;
+            border-radius: 30px;
+            padding: 0 8px;
+            margin-left: 6px;
+            display: inline-block;
+        }
+        .no-stud {
+            background: #f0e6d2;
+            padding: 12px;
+            border-radius: 28px;
+            text-align: center;
+            color: #aa7c58;
+        }.info-tip {
+    background: #e9f4e8;
+    border-left: 5px solid #f1b82e;
+    border-radius: 20px;
+    padding: 10px 18px;
+    margin: 15px 0;
+    font-size: 0.85rem;
+    color: #2d411c;
+    text-align: left;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.info-tip b {
+    color: #b45f06;
+}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="hero">
+        <div style="text-align:center; font-size:0.7rem; padding: 1rem; color: #6f7c64;">
+    🧪 非商用工具 | 数据基于洛克王国 | 禁止用于盈利性目的
+</div>
+        <h1>🐣 蛋组查询器 · 种公匹配</h1>
+        <!-- 新增提示 -->
+        <div class="info-tip">
+        💡 提示：以下宠物在游戏中存在进化分支，本数据库统一使用<b>最小形态</b>名称：<br>
+        可立鸡 · 粉星仔 · 画精灵 · 书魔虫 · 棋棋 · 毛头小蛛 · 乖乖鹄 · 果冻 · 墨鱿士
+        
+        </div>
+
+        <div class="search-box" style="position: relative;">
+            <input type="text" id="petInput" placeholder="输入宠物名称，例如 粉星仔" autocomplete="off">
+            <button id="searchBtn">查询</button>
+            <button id="randomBtn">🎲 随机一只</button>
+            <a href="stud.html" target="_blank"><button class="btn-gold">🏆 优质种公榜</button></a>
+        </div>
+        <div id="autocompleteList" style="position: relative;"></div>
+        <div class="nav-links" style="margin-top: 10px;">
+            <a href="admin.html">📝 数据维护</a>
+        </div>
+    </div>
+
+    <div class="result-card">
+        <div id="resultBadges"></div>
+    </div>
+
+    <div id="studMatchPanel" style="display:none;" class="stud-list">
+        <h3>✨ 可与该宠物孵蛋的优质种公 ✨</h3>
+        <p style="font-size:0.8rem; margin-bottom:8px;">💡 优先展示自身蛋组多的种公（蛋组越多，配种范围越广）</p>
+        <div id="studMatchList"></div>
+    </div>
+
+    <div id="groupPetsPanel" style="display:none;">
+        <h3>🐾 该蛋组包含的宠物</h3>
+        <div id="groupPetsList"></div>
+    </div>
+</div>
+<script src="data.js"></script>
+<script src="common.js"></script>
+<script>
+    refreshData();
+    const petInput = document.getElementById('petInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const randomBtn = document.getElementById('randomBtn');
+    const resultBadges = document.getElementById('resultBadges');
+    const groupPetsPanel = document.getElementById('groupPetsPanel');
+    const groupPetsList = document.getElementById('groupPetsList');
+    const autocompleteDiv = document.getElementById('autocompleteList');
+    const studMatchPanel = document.getElementById('studMatchPanel');
+    const studMatchList = document.getElementById('studMatchList');
+
+    let allPetNames = getAllPetNames();
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // 修正排序：优先按种公自身蛋组数量降序，再按共同蛋组数量降序，最后按名称
+    // function findMatchStuds(currentPetName, currentPetGroups) {
+    //     const currentSet = new Set(currentPetGroups);
+    //     const candidates = [];
+    //     for (let [key, entry] of petToGroups.entries()) {
+    //         if (entry.name === currentPetName) continue;
+    //         const petGroupsSet = entry.groups;
+    //         const common = [];
+    //         for (let g of petGroupsSet) {
+    //             if (currentSet.has(g)) common.push(g);
+    //         }
+    //         if (common.length > 0) {
+    //             candidates.push({
+    //                 name: entry.name,
+    //                 totalGroups: petGroupsSet.size,
+    //                 commonGroups: common
+    //             });
+    //         }
+    //     }
+    //     // 排序：自身蛋组数 > 共同蛋组数 > 名称
+    //     candidates.sort((a,b) => {
+    //         if (a.totalGroups !== b.totalGroups) return b.totalGroups - a.totalGroups;
+    //         if (a.commonGroups.length !== b.commonGroups.length) return b.commonGroups.length - a.commonGroups.length;
+    //         return a.name.localeCompare(b.name);
+    //     });
+    //     return candidates;
+    // }
+    // 替换原来的 findMatchStuds 函数（在 index.html 的 script 中）
+function findMatchStuds(currentPetName, currentPetGroups) {
+    const currentSet = new Set(currentPetGroups);
+    const candidates = [];
+    for (let [key, entry] of petToGroups.entries()) {
+        if (entry.name === currentPetName) continue;
+        const petGroupsSet = entry.groups;
+        const common = [];
+        for (let g of petGroupsSet) {
+            if (currentSet.has(g)) common.push(g);
+        }
+        if (common.length > 0) {
+            candidates.push({
+                name: entry.name,
+                totalGroups: petGroupsSet.size,
+                commonGroups: common,
+                matchCount: getPetMatchCount(entry.name)   // 从 common.js 获取
+            });
+        }
+    }
+    // 排序：先按 matchCount 降序，再按 common 数量降序，再按 totalGroups 降序
+    candidates.sort((a,b) => {
+        if (a.matchCount !== b.matchCount) return b.matchCount - a.matchCount;
+        if (a.commonGroups.length !== b.commonGroups.length) return b.commonGroups.length - a.commonGroups.length;
+        return b.totalGroups - a.totalGroups;
+    });
+    return candidates;
+}
+
+    function renderResult(petName) {
+        let groups = getPetGroups(petName);
+        if (!groups.length) {
+            resultBadges.innerHTML = `<div class="not-found">❓ 未找到 “${escapeHtml(petName)}” 的蛋组信息</div>`;
+            groupPetsPanel.style.display = 'none';
+            studMatchPanel.style.display = 'none';
+            return;
+        }
+        let html = `<div class="pet-title">🐉 宠物：${escapeHtml(petName)}  · 共 ${groups.length} 个蛋组</div><div class="badge-group">`;
+        groups.forEach(group => {
+            html += `<span class="egg-badge" data-group="${escapeHtml(group)}">🧬 ${escapeHtml(group)}</span>`;
+        });
+        html += `</div>`;
+        resultBadges.innerHTML = html;
+        groupPetsPanel.style.display = 'none';
+
+        document.querySelectorAll('.egg-badge').forEach(el => {
+            el.addEventListener('click', (e) => {
+                let groupName = el.getAttribute('data-group');
+                let pets = getPetsByGroup(groupName);
+                if (pets.length) {
+                    groupPetsList.innerHTML = pets.map(p => `<span class="pet-chip">${escapeHtml(p)}</span>`).join('');
+                    groupPetsPanel.style.display = 'block';
+                } else {
+                    groupPetsList.innerHTML = '暂无宠物';
+                    groupPetsPanel.style.display = 'block';
+                }
+            });
+        });
+
+        const matchStuds = findMatchStuds(petName, groups);
+        if (matchStuds.length === 0) {
+            studMatchPanel.style.display = 'block';
+            studMatchList.innerHTML = '<div class="no-stud">😢 抱歉，当前数据库中没有与该宠物拥有共同蛋组的其他宠物。<br>你可以通过「数据维护」页面添加更多种公。</div>';
+        } else {
+            studMatchPanel.style.display = 'block';
+            let listHtml = '';
+            matchStuds.forEach(stud => {
+                const commonStr = stud.commonGroups.join('、');
+                listHtml += `<span class="stud-item" data-pet="${escapeHtml(stud.name)}">
+                                🧬 ${escapeHtml(stud.name)}
+                                <span class="stud-count">${stud.totalGroups}蛋组</span>
+                                <span class="common-groups" title="共同蛋组：${escapeHtml(commonStr)}">🎯 ${stud.commonGroups.length}共同</span>
+                             </span>`;
+            });
+            studMatchList.innerHTML = listHtml;
+            document.querySelectorAll('#studMatchList .stud-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    let pet = item.getAttribute('data-pet');
+                    petInput.value = pet;
+                    renderResult(pet);
+                    autocompleteDiv.innerHTML = '';
+                });
+            });
+        }
+    }
+
+    function showAutocomplete(filter) {
+        autocompleteDiv.innerHTML = '';
+        if (!filter) return;
+        const lowerFilter = filter.toLowerCase();
+        const matches = allPetNames.filter(name => name.toLowerCase().includes(lowerFilter)).slice(0, 10);
+        if (matches.length === 0) return;
+        const container = document.createElement('div');
+        container.className = 'autocomplete-items';
+        matches.forEach(match => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.textContent = match;
+            item.addEventListener('click', () => {
+                petInput.value = match;
+                renderResult(match);
+                autocompleteDiv.innerHTML = '';
+            });
+            container.appendChild(item);
+        });
+        autocompleteDiv.appendChild(container);
+    }
+
+    function randomPet() {
+        if (allPetNames.length === 0) return;
+        let rand = allPetNames[Math.floor(Math.random() * allPetNames.length)];
+        petInput.value = rand;
+        renderResult(rand);
+    }
+
+    petInput.addEventListener('input', (e) => showAutocomplete(e.target.value));
+    petInput.addEventListener('blur', () => setTimeout(() => { autocompleteDiv.innerHTML = ''; }, 200));
+    searchBtn.addEventListener('click', () => {
+        let val = petInput.value.trim();
+        if (val) renderResult(val);
+        autocompleteDiv.innerHTML = '';
+    });
+    randomBtn.addEventListener('click', randomPet);
+    petInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchBtn.click();
+    });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const petParam = urlParams.get('pet');
+    if (petParam) {
+        petInput.value = petParam;
+        renderResult(petParam);
+    } else if (allPetNames.length) {
+        let defaultPet = allPetNames.find(n => n.includes('粉星仔')) || allPetNames[0];
+        petInput.value = defaultPet;
+        renderResult(defaultPet);
+    }
+</script>
+</body>
+</html>
