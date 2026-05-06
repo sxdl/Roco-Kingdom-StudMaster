@@ -23,6 +23,9 @@
 
 ## 🚀 使用方法
 
+# 在线使用：https://cnrudy.github.io/Roco-Kingdom-StudMaster/
+
+# 离线使用
 1. 将全部 6 个文件放入**同一文件夹**。
 2. 双击 `index.html` 用浏览器打开（推荐 Chrome / Edge / 手机浏览器）。
 3. 在搜索框输入宠物名（支持联想）→ 查看蛋组及种公匹配。
