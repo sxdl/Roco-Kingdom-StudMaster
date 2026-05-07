@@ -2,6 +2,9 @@
 
 > 纯前端、离线可用，支持种公匹配、排行榜、我的仓库、数据维护等功能。
 
+<img width="819" height="468" alt="🐣 洛克王国·世界 蛋组孵蛋工具" src="https://github.com/user-attachments/assets/10953fd8-be99-49ec-a1a8-6aeea35a0e1f" />
+
+
 ## ✨ 主要功能
 
 - 🔍 **宠物查询**：输入宠物名，显示其所有蛋组（14大蛋组）。
