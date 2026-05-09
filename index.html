@@ -145,41 +145,64 @@
             margin: 0 8px;
         }
 
-        /* 移动端适配 */
-        @media (max-width: 600px) {
-            .collapsible-header {
-                padding: 0.6rem 1rem;
-                font-size: 1rem;
-            }
-            .nature-grid {
-                gap: 6px;
-                padding: 8px;
-            }
-            .nature-option {
-                font-size: 0.75rem;
-                padding: 6px 2px;
-            }
-            .add-to-garage-btn {
-                padding: 4px 12px;
-                font-size: 0.7rem;
-            }
-            #addToGarageModal > div {
-                width: 320px;
-                padding: 16px;
-            }
+        /* 仓库标记样式 */
+        .garage-badge {
+            background: #2b5e2f;
+            color: white;
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+        .garage-natures {
+            background: #e5efdb;
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            margin-left: 8px;
+            color: #2c5e2a;
         }
 
-        /* 自定义滚动条（可选） */
-        .nature-grid::-webkit-scrollbar {
-            width: 4px;
+        /* 返回顶部按钮 */
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 20px;
+            background: #2b5e2f;
+            color: white;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: 0.2s;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            font-size: 1.5rem;
+            border: none;
         }
-        .nature-grid::-webkit-scrollbar-track {
-            background: #e2e8e0;
-            border-radius: 4px;
+        .back-to-top.show {
+            opacity: 1;
+            visibility: visible;
         }
-        .nature-grid::-webkit-scrollbar-thumb {
-            background: #a0b896;
-            border-radius: 4px;
+        .back-to-top:hover {
+            background: #1e4521;
+            transform: scale(1.05);
+        }
+        @media (max-width: 600px) {
+            .back-to-top {
+                bottom: 20px;
+                right: 15px;
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
         }
     </style>
 </head>
@@ -253,6 +276,9 @@
     </div>
 </div>
 
+<!-- 返回顶部按钮 -->
+<button class="back-to-top" id="backToTopBtn" aria-label="返回顶部">↑</button>
+
 <script src="data.js"></script>
 <script src="common.js"></script>
 <script>
@@ -272,6 +298,7 @@
     const natureGrid = document.getElementById('natureGrid');
     const confirmAddBtn = document.getElementById('confirmAddBtn');
     const cancelAddBtn = document.getElementById('cancelAddBtn');
+    const backToTopBtn = document.getElementById('backToTopBtn');
 
     let allPetNames = getAllPetNames();
     let currentSelectedPet = null;
@@ -292,6 +319,7 @@
     };
     const ALL_NATURES = Object.keys(NATURE_INFO);
 
+    // ---------- 种公仓库数据读取 ----------
     function loadMyPets() {
         const stored = localStorage.getItem('my_pets');
         if (stored) {
@@ -301,6 +329,19 @@
     }
     function saveMyPets(pets) {
         localStorage.setItem('my_pets', JSON.stringify(pets));
+    }
+
+    // 获取宠物名 -> 性格列表的映射（仓库中该宠物的所有性格）
+    function getGaragePetNaturesMap() {
+        const pets = loadMyPets();
+        const map = new Map(); // key: petName, value: array of natures
+        for (let pet of pets) {
+            if (!map.has(pet.name)) map.set(pet.name, []);
+            if (!map.get(pet.name).includes(pet.nature)) {
+                map.get(pet.name).push(pet.nature);
+            }
+        }
+        return map;
     }
 
     function addToGarage(petName, nature) {
@@ -418,6 +459,8 @@
         });
 
         const matchStuds = findMatchStuds(petName, groups);
+        const garageMap = getGaragePetNaturesMap();
+
         if (matchStuds.length === 0) {
             studMatchCollapsible.style.display = 'block';
             studMatchList.innerHTML = '<div class="no-stud">😢 抱歉，当前数据库中没有与该宠物拥有共同蛋组的其他宠物。<br>你可以通过「数据维护」页面添加更多种公。</div>';
@@ -426,10 +469,18 @@
             let listHtml = '';
             matchStuds.forEach(stud => {
                 const commonStr = stud.commonGroups.join('、');
+                const inGarage = garageMap.has(stud.name);
+                let garageInfo = '';
+                if (inGarage) {
+                    const natures = garageMap.get(stud.name).join('、');
+                    garageInfo = `<span class="garage-badge" title="已在种公仓库中">🏠 已有</span>
+                                  <span class="garage-natures" title="仓库中的性格">🎭 ${natures}</span>`;
+                }
                 listHtml += `<span class="stud-item" data-pet="${escapeHtml(stud.name)}">
                                 🧬 ${escapeHtml(stud.name)}
                                 <span class="stud-count">${stud.totalGroups}蛋组</span>
                                 <span class="common-groups" title="共同蛋组：${escapeHtml(commonStr)}">🎯 ${stud.commonGroups.length}共同</span>
+                                ${garageInfo}
                              </span>`;
             });
             studMatchList.innerHTML = listHtml;
@@ -472,6 +523,21 @@
         petInput.value = rand;
         renderResult(rand);
     }
+
+    // 返回顶部逻辑
+    function handleBackToTop() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function toggleBackToTopButton() {
+        if (window.scrollY > 200) {
+            backToTopBtn.classList.add('show');
+        } else {
+            backToTopBtn.classList.remove('show');
+        }
+    }
+    backToTopBtn.addEventListener('click', handleBackToTop);
+    window.addEventListener('scroll', toggleBackToTopButton);
+    toggleBackToTopButton(); // 初始检查
 
     petInput.addEventListener('input', (e) => showAutocomplete(e.target.value));
     petInput.addEventListener('blur', () => setTimeout(() => { autocompleteDiv.innerHTML = ''; }, 200));

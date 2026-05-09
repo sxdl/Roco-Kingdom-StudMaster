@@ -73,6 +73,35 @@
         .group-card.missing .badge {
             background: #d9534f;
         }
+        /* 性格筛选区域 */
+        .nature-filter-panel {
+            background: #f9f5e3;
+            border-radius: 28px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+        .nature-checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 12px 0;
+        }
+        .nature-checkbox-item {
+            background: white;
+            border-radius: 40px;
+            padding: 5px 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            border: 1px solid #cbdcc2;
+        }
+        .nature-checkbox-item input {
+            margin: 0;
+        }
+        .filter-buttons {
+            margin-top: 10px;
+        }
         /* 折叠卡片样式 */
         .collapsible-group {
             margin-bottom: 1rem;
@@ -134,17 +163,53 @@
             justify-content: flex-end;
             margin-top: 10px;
         }
+        .missing-tip {
+            background: #fff0d0;
+            border-radius: 28px;
+            padding: 0.8rem;
+            margin: 1rem 0;
+            text-align: center;
+            font-weight: bold;
+            color: #b45f06;
+        }
+        /* 返回顶部按钮 */
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 20px;
+            background: #2b5e2f;
+            color: white;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: 0.2s;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            font-size: 1.5rem;
+            border: none;
+        }
+        .back-to-top.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .back-to-top:hover {
+            background: #1e4521;
+            transform: scale(1.05);
+        }
         @media (max-width: 600px) {
-            .coverage-grid {
-                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            }
-            .group-pet {
-                font-size: 0.75rem;
-                padding: 4px 12px;
-            }
-            .action-buttons button, .action-buttons a {
-                padding: 6px 16px;
-                font-size: 0.8rem;
+            .back-to-top {
+                bottom: 20px;
+                right: 15px;
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
             }
         }
     </style>
@@ -155,7 +220,7 @@
         <div style="text-align:center; font-size:0.7rem; padding: 1rem; color: #6f7c64;">
         🧪 非商用工具 | 数据基于洛克王国 | 禁止用于盈利性目的
         </div>
-        <h1>📦 种公仓库 · 蛋组覆盖分析</h1>
+        <h1>📦 种公仓库 · 蛋组 & 性格覆盖分析</h1>
         <div class="nav-links">
             <a href="index.html">← 返回查询</a>
             <a href="stud.html">🏆 种公排行榜</a>
@@ -163,9 +228,20 @@
         </div>
     </div>
 
+    <!-- 性格筛选区 -->
+    <div class="nature-filter-panel">
+        <h3>🎭 性格筛选（多选）</h3>
+        <div id="natureCheckboxGroup" class="nature-checkbox-group"></div>
+        <div class="filter-buttons">
+            <button id="clearFilterBtn">清除筛选</button>
+            <button id="applyFilterBtn" style="background:#2b5e2f;">应用筛选</button>
+        </div>
+    </div>
+
     <div class="stats-card" id="statsArea">
-        <h3>📊 当前仓库统计</h3>
+        <h3>📊 当前仓库统计（已筛选）</h3>
         <div id="statsText"></div>
+        <div id="missingGroupsTip" class="missing-tip" style="display:none;"></div>
         <div class="import-export">
             <button id="exportDataBtn">📁 导出仓库数据</button>
             <label for="importFileInput" class="btn" style="background:#2b5e2f; color:white; padding:8px 20px; border-radius:40px; cursor:pointer;">📂 导入仓库数据</label>
@@ -183,14 +259,18 @@
     <div id="petByGroupContainer"></div>
 </div>
 
+<!-- 返回顶部按钮 -->
+<button class="back-to-top" id="backToTopBtn" aria-label="返回顶部">↑</button>
+
 <script src="data.js"></script>
 <script src="common.js"></script>
 <script>
     refreshData();
     let myPets = [];
     let eggGroups = [];
+    let currentSelectedNatures = [];
 
-    // 性格数据（与主页保持一致）
+    // 性格数据（仅用于提示）
     const NATURE_INFO = {
         "聪明": { inc: "魔攻", dec: "物攻" }, "专注": { inc: "魔攻", dec: "物防" }, "偏执": { inc: "魔攻", dec: "魔防" },
         "冷静": { inc: "魔攻", dec: "速度" }, "理性": { inc: "魔攻", dec: "生命" }, "固执": { inc: "物攻", dec: "魔攻" },
@@ -203,6 +283,7 @@
         "热情": { inc: "速度", dec: "生命" }, "沉默": { inc: "生命", dec: "物攻" }, "平和": { inc: "生命", dec: "魔攻" },
         "忧郁": { inc: "生命", dec: "物防" }, "粗心": { inc: "生命", dec: "魔防" }, "踏实": { inc: "生命", dec: "速度" }
     };
+    const ALL_NATURES = Object.keys(NATURE_INFO);
 
     function loadMyPets() {
         const stored = localStorage.getItem('my_pets');
@@ -211,11 +292,14 @@
         } else {
             myPets = [];
         }
+        initNatureCheckboxes();
+        currentSelectedNatures = [];
         renderAnalysis();
     }
 
     function saveMyPets() {
         localStorage.setItem('my_pets', JSON.stringify(myPets));
+        initNatureCheckboxes();
         renderAnalysis();
     }
 
@@ -226,11 +310,49 @@
         return eggGroups;
     }
 
-    function getGroupToPetsMap() {
+    function getExistingNatures() {
+        const natures = new Set();
+        for (let pet of myPets) {
+            natures.add(pet.nature);
+        }
+        return Array.from(natures).sort();
+    }
+
+    function initNatureCheckboxes() {
+        const container = document.getElementById('natureCheckboxGroup');
+        const existingNatures = getExistingNatures();
+        if (existingNatures.length === 0) {
+            container.innerHTML = '<p>暂无宠物，请添加</p>';
+            return;
+        }
+        let html = '';
+        existingNatures.forEach(nature => {
+            html += `<label class="nature-checkbox-item">
+                        <input type="checkbox" value="${nature}"> ${nature}
+                     </label>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function getSelectedNatures() {
+        const checkboxes = document.querySelectorAll('#natureCheckboxGroup input[type="checkbox"]');
+        const selected = [];
+        checkboxes.forEach(cb => {
+            if (cb.checked) selected.push(cb.value);
+        });
+        return selected;
+    }
+
+    function getFilteredPets() {
+        if (currentSelectedNatures.length === 0) return myPets;
+        return myPets.filter(pet => currentSelectedNatures.includes(pet.nature));
+    }
+
+    function getGroupToPetsMapFiltered(pets) {
         const map = new Map();
         const groups = getEggGroups();
         groups.forEach(g => map.set(g, []));
-        for (let pet of myPets) {
+        for (let pet of pets) {
             const petGroups = getPetGroups(pet.name);
             for (let g of petGroups) {
                 if (map.has(g)) {
@@ -248,19 +370,27 @@
     }
 
     function renderAnalysis() {
+        const filteredPets = getFilteredPets();
         const groups = getEggGroups();
-        const groupMap = getGroupToPetsMap();
-        const totalPets = myPets.length;
+        const groupMap = getGroupToPetsMapFiltered(filteredPets);
+        const totalPets = filteredPets.length;
         const coveredGroups = Array.from(groupMap.entries()).filter(([_, pets]) => pets.length > 0).length;
         const missingCount = groups.length - coveredGroups;
+        const missingGroupNames = groups.filter(g => (groupMap.get(g) || []).length === 0);
 
         document.getElementById('statsText').innerHTML = `
-            <p>🐾 共拥有 <strong>${totalPets}</strong> 只宠物，覆盖 <strong>${coveredGroups}</strong> 个蛋组，缺失 <strong>${missingCount}</strong> 个蛋组。</p>
+            <p>🐾 当前筛选宠物：<strong>${totalPets}</strong> 只，覆盖 <strong>${coveredGroups}</strong> 个蛋组，缺失 <strong>${missingCount}</strong> 个蛋组。</p>
             <p>⭐ 标记“优质”的宠物表示蛋组数 ≥ 2（更易配种）。</p>
-            <p>⭐ 请随时导出仓库数据备份，该数据并不上传云端，只保存在本地浏览器。
         `;
+        const missingTipDiv = document.getElementById('missingGroupsTip');
+        if (missingGroupNames.length > 0) {
+            missingTipDiv.style.display = 'block';
+            missingTipDiv.innerHTML = `⚠️ 当前筛选的性格下，缺失以下蛋组：<strong>${missingGroupNames.join('、')}</strong>。建议补充这些蛋组的宠物。`;
+        } else {
+            missingTipDiv.style.display = 'none';
+        }
 
-        // 蛋组覆盖卡片（可点击跳转）
+        // 蛋组覆盖卡片
         const coverageDiv = document.getElementById('groupCoverage');
         coverageDiv.innerHTML = '';
         groups.forEach(group => {
@@ -278,13 +408,11 @@
             coverageDiv.appendChild(card);
         });
 
-        // 按蛋组显示可折叠宠物列表（无宠物或超过10只默认折叠）
         const container = document.getElementById('petByGroupContainer');
-        container.innerHTML = '<h3>📌 按蛋组分组的宠物列表</h3>';
+        container.innerHTML = '<h3>📌 按蛋组分组的宠物列表（当前筛选）</h3>';
         groups.forEach(group => {
             const pets = groupMap.get(group) || [];
             const petCount = pets.length;
-            // 默认折叠条件：无宠物 或 宠物数 > 10
             const defaultCollapsed = (petCount === 0 || petCount > 10);
             const section = document.createElement('div');
             section.className = 'collapsible-group';
@@ -293,7 +421,7 @@
 
             let petsHtml = '';
             if (petCount === 0) {
-                petsHtml = '<p style="color:#999; padding:1rem;">未拥有该蛋组的宠物</p>';
+                petsHtml = '<p style="color:#999; padding:1rem;">该蛋组无宠物（性格筛选后）</p>';
             } else {
                 petsHtml = '<div style="padding:1rem;">';
                 pets.forEach(pet => {
@@ -320,7 +448,6 @@
             container.appendChild(section);
         });
 
-        // 绑定折叠事件
         document.querySelectorAll('.collapsible-group').forEach(card => {
             const header = card.querySelector('.collapsible-header');
             if (header) {
@@ -331,7 +458,6 @@
             }
         });
 
-        // 事件委托删除宠物（二次确认）
         container.addEventListener('click', (e) => {
             const delBtn = e.target.closest('.del');
             if (!delBtn) return;
@@ -348,25 +474,21 @@
         });
     }
 
-    // 滚动到指定蛋组并展开（如果折叠）
     function scrollToGroup(groupName) {
         const targetSection = Array.from(document.querySelectorAll('.collapsible-group')).find(
             section => section.getAttribute('data-groupname') === groupName
         );
         if (targetSection) {
-            // 如果是折叠状态，先展开
             if (targetSection.classList.contains('collapsed')) {
                 targetSection.classList.remove('collapsed');
             }
             targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            // 高亮闪烁效果
             targetSection.style.transition = 'background 0.3s';
             targetSection.style.backgroundColor = '#fff8e7';
             setTimeout(() => { targetSection.style.backgroundColor = ''; }, 800);
         }
     }
 
-    // 导出仓库数据
     function exportData() {
         const dataStr = JSON.stringify(myPets, null, 2);
         const blob = new Blob([dataStr], { type: 'application/json' });
@@ -380,7 +502,6 @@
         URL.revokeObjectURL(url);
     }
 
-    // 导入仓库数据（替换当前数据）
     function importData(file) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -402,7 +523,22 @@
         reader.readAsText(file);
     }
 
-    // 按钮事件绑定
+    // 返回顶部逻辑
+    const backToTopBtn = document.getElementById('backToTopBtn');
+    function handleBackToTop() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function toggleBackToTopButton() {
+        if (window.scrollY > 200) {
+            backToTopBtn.classList.add('show');
+        } else {
+            backToTopBtn.classList.remove('show');
+        }
+    }
+    backToTopBtn.addEventListener('click', handleBackToTop);
+    window.addEventListener('scroll', toggleBackToTopButton);
+    toggleBackToTopButton();
+
     document.getElementById('exportDataBtn').addEventListener('click', exportData);
     const importInput = document.getElementById('importFileInput');
     document.querySelector('label[for="importFileInput"]').addEventListener('click', () => {
@@ -411,6 +547,16 @@
     importInput.addEventListener('change', (e) => {
         if (e.target.files.length) importData(e.target.files[0]);
         e.target.value = '';
+    });
+
+    document.getElementById('applyFilterBtn').addEventListener('click', () => {
+        currentSelectedNatures = getSelectedNatures();
+        renderAnalysis();
+    });
+    document.getElementById('clearFilterBtn').addEventListener('click', () => {
+        document.querySelectorAll('#natureCheckboxGroup input[type="checkbox"]').forEach(cb => cb.checked = false);
+        currentSelectedNatures = [];
+        renderAnalysis();
     });
 
     loadMyPets();
