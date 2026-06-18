@@ -9,14 +9,22 @@ const CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // 6小时
 
 // ===== 全局状态 =====
 let eggDataList = [];
-let petToGroups = new Map();
-let groupToPets = new Map();
-let petMatchCount = new Map();
+// 完整映射：每个形态独立（用于查询/搜索/显示）
+let petToGroups = new Map();      // name.lower -> { id, name, baseName, groups: Set }
+let groupToPets = new Map();      // 蛋组名 -> Set(fullName)
+let petMatchCount = new Map();    // fullName.lower -> 可配种数
+// 去重映射：按家族（基础名）合并（用于排行榜）
+let familyToGroups = new Map();   // baseName.lower -> { name, groups: Set }
+let familyMatchCount = new Map(); // baseName.lower -> 可配种数
+
+// ===== 工具 =====
+function getBaseName(name) {
+    return name.replace(/[（(][^）)]*[）)]/g, '').trim();
+}
 
 // ===== 数据加载 =====
 function loadEggData() {
     return new Promise((resolve, reject) => {
-        // 1. 有有效缓存则直接用
         try {
             const cached = localStorage.getItem(CACHE_KEY);
             const ts = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0');
@@ -24,13 +32,10 @@ function loadEggData() {
                 eggDataList = JSON.parse(cached);
                 buildMappings();
                 resolve(eggDataList);
-                // 后台静默刷新
                 fetchFromWiki().catch(() => {});
                 return;
             }
         } catch (e) {}
-
-        // 2. 缓存过期，在线拉取
         fetchFromWiki().then(resolve).catch(reject);
     });
 }
@@ -53,7 +58,6 @@ function fetchFromWiki() {
             if (!content) throw new Error('未找到 Egg.json 页面内容');
             const data = JSON.parse(content);
             eggDataList = data;
-            // 写入缓存
             try {
                 localStorage.setItem(CACHE_KEY, JSON.stringify(data));
                 localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
@@ -68,6 +72,8 @@ function buildMappings() {
     petToGroups.clear();
     groupToPets.clear();
     petMatchCount.clear();
+    familyToGroups.clear();
+    familyMatchCount.clear();
 
     const allGroups = new Set();
     for (let item of eggDataList) {
@@ -75,33 +81,31 @@ function buildMappings() {
     }
     for (let g of allGroups) groupToPets.set(g, new Set());
 
-    // 提取基础名：去掉括号内的形态描述
-    // e.g. "鸭吉吉（蓬松的样子）" → "鸭吉吉"
-    function baseName(name) {
-        return name.replace(/[（(][^）)]*[）)]/g, '').trim();
-    }
-
     for (let item of eggDataList) {
         let name = (item.name || '').trim();
         if (!name) continue;
-        let base = baseName(name);
+        let base = getBaseName(name);
         if (!base) continue;
-        let lower = base.toLowerCase();
-        if (!petToGroups.has(lower)) {
-            petToGroups.set(lower, { id: item.id, name: base, groups: new Set() });
+        let lower = name.toLowerCase();
+        let baseLower = base.toLowerCase();
+
+        // 完整映射（每个形态独立）
+        petToGroups.set(lower, { id: item.id, name: name, baseName: base, groups: new Set() });
+        for (let g of (item.eggGroups || [])) {
+            petToGroups.get(lower).groups.add(g);
+            groupToPets.get(g).add(name);
         }
-        let entry = petToGroups.get(lower);
-        if (item.id && (!entry.id || item.id < entry.id)) entry.id = item.id;
-        // 优先使用不带括号的基础名作为显示名
-        if (!base.includes('（') && !base.includes('(')) {
-            entry.name = base;
+
+        // 家族映射（按基础名合并蛋组）
+        if (!familyToGroups.has(baseLower)) {
+            familyToGroups.set(baseLower, { name: base, groups: new Set() });
         }
         for (let g of (item.eggGroups || [])) {
-            entry.groups.add(g);
-            if (groupToPets.has(g)) groupToPets.get(g).add(base);
+            familyToGroups.get(baseLower).groups.add(g);
         }
     }
 
+    // 可配种数（完整映射）
     for (let [lower, entry] of petToGroups.entries()) {
         const allPets = new Set();
         for (let g of entry.groups) {
@@ -113,12 +117,32 @@ function buildMappings() {
         }
         petMatchCount.set(lower, allPets.size);
     }
+
+    // 可配种数（家族映射，按家族名去重后统计）
+    for (let [baseLower, entry] of familyToGroups.entries()) {
+        const allFamilies = new Set();
+        for (let g of entry.groups) {
+            if (g === '无法孵蛋') continue;
+            for (let [otherLower, otherEntry] of familyToGroups.entries()) {
+                if (otherLower === baseLower) continue;
+                if (otherEntry.groups.has(g)) {
+                    allFamilies.add(otherLower);
+                }
+            }
+        }
+        familyMatchCount.set(baseLower, allFamilies.size);
+    }
 }
 
-// ===== 查询接口 =====
+// ===== 查询接口（完整数据，含所有形态） =====
 function getPetGroups(petName) {
     const entry = petToGroups.get(petName.toLowerCase());
     return entry ? Array.from(entry.groups) : [];
+}
+
+function getPetBaseName(petName) {
+    const entry = petToGroups.get(petName.toLowerCase());
+    return entry ? entry.baseName : getBaseName(petName);
 }
 
 function getAllPetNames() {
@@ -140,15 +164,16 @@ function getAllEggGroups() {
     return Array.from(groupToPets.keys()).sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
+// ===== 排行榜接口（按家族去重） =====
 function getStudRanking() {
     const list = [];
-    for (let [lower, entry] of petToGroups.entries()) {
+    for (let [baseLower, entry] of familyToGroups.entries()) {
         const groups = Array.from(entry.groups).filter(g => g !== '无法孵蛋');
         if (groups.length < 2) continue;
         list.push({
             name: entry.name,
             groupsCount: groups.length,
-            matchCount: petMatchCount.get(lower) || 0,
+            matchCount: familyMatchCount.get(baseLower) || 0,
             groups: groups
         });
     }
