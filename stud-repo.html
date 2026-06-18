@@ -305,7 +305,7 @@
 
     function getEggGroups() {
         if (eggGroups.length) return eggGroups;
-        eggGroups = getAllEggGroups();
+        eggGroups = getAllEggGroups().filter(g => g !== '无法孵蛋');
         return eggGroups;
     }
 
@@ -561,7 +561,7 @@
     // 加载蛋组数据后初始化仓库
     loadEggData().then(data => {
         const stats = getTotalStats();
-        document.getElementById('dataStatus').textContent = `✅ 已加载 ${stats.totalPets} 只宠物 · ${stats.totalGroups} 个蛋组 · 来源 BWIKI`;
+        document.getElementById('dataStatus').textContent = `✅ 已加载 ${stats.totalPets} 只宠物 · ${stats.totalGroups - 1} 个蛋组 · 来源 BWIKI`;
         dataReady = true;
         loadMyPets();
     }).catch(err => {
