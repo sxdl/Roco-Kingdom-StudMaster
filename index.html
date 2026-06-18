@@ -50,7 +50,7 @@
             transform: rotate(-90deg);
         }
 
-        /* 提示信息条 - 独立且稳定 */
+        /* 提示信息条 */
         .info-tip {
             background: #e9f4e8;
             border-left: 5px solid #f1b82e;
@@ -66,21 +66,14 @@
             color: #b45f06;
         }
 
-        /* 原有卡片内边距恢复 */
         .result-card, .stud-list, #groupPetsPanel {
             margin: 0;
             border: none;
             background: transparent;
         }
-        .result-card {
-            margin-top: 0;
-        }
-        .stud-list {
-            padding: 1rem;
-        }
-        #groupPetsList {
-            padding: 1rem;
-        }
+        .result-card { margin-top: 0; }
+        .stud-list { padding: 1rem; }
+        #groupPetsList { padding: 1rem; }
 
         /* 添加到仓库按钮 */
         .add-to-garage-btn {
@@ -94,11 +87,9 @@
             margin-left: 12px;
             transition: 0.2s;
         }
-        .add-to-garage-btn:hover {
-            background: #1e4521;
-        }
+        .add-to-garage-btn:hover { background: #1e4521; }
 
-        /* 性格九宫格 - 固定一行五个，滚动 */
+        /* 性格九宫格 */
         .nature-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -129,21 +120,14 @@
             border-color: #e08e1a;
         }
 
-        /* 模态框（添加到种公仓库弹窗）放大 */
+        /* 模态框 */
         #addToGarageModal > div {
             max-width: 95%;
             width: 380px;
             padding: 24px;
         }
-        #addToGarageModal h3 {
-            font-size: 1.4rem;
-            margin-bottom: 12px;
-        }
-        #addToGarageModal button {
-            font-size: 1rem;
-            padding: 10px 20px;
-            margin: 0 8px;
-        }
+        #addToGarageModal h3 { font-size: 1.4rem; margin-bottom: 12px; }
+        #addToGarageModal button { font-size: 1rem; padding: 10px 20px; margin: 0 8px; }
 
         /* 仓库标记样式 */
         .garage-badge {
@@ -163,6 +147,16 @@
             margin-left: 8px;
             color: #2c5e2a;
         }
+
+        /* 数据状态 */
+        .data-status {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #6f7c64;
+            padding: 4px;
+        }
+        .data-status.loading { color: #b45f06; }
+        .data-status.error { color: #d9534f; }
 
         /* 返回顶部按钮 */
         .back-to-top {
@@ -187,22 +181,10 @@
             font-size: 1.5rem;
             border: none;
         }
-        .back-to-top.show {
-            opacity: 1;
-            visibility: visible;
-        }
-        .back-to-top:hover {
-            background: #1e4521;
-            transform: scale(1.05);
-        }
+        .back-to-top.show { opacity: 1; visibility: visible; }
+        .back-to-top:hover { background: #1e4521; transform: scale(1.05); }
         @media (max-width: 600px) {
-            .back-to-top {
-                bottom: 20px;
-                right: 15px;
-                width: 40px;
-                height: 40px;
-                font-size: 1.2rem;
-            }
+            .back-to-top { bottom: 20px; right: 15px; width: 40px; height: 40px; font-size: 1.2rem; }
         }
     </style>
 </head>
@@ -210,26 +192,26 @@
 <div class="container">
     <div class="hero">
         <div style="text-align:center; font-size:0.7rem; padding: 1rem; color: #6f7c64;">
-        🧪 非商用工具 | 数据基于洛克王国 | 禁止用于盈利性目的
+        🧪 非商用工具 | 数据基于洛克王国BWIKI | 禁止用于盈利性目的
         </div>
         <h1>🐣 蛋组查询器 · 种公匹配</h1>
-        <div class="info-tip">
-            💡 提示：以下宠物使用<b>最小形态</b>名称：可立鸡 · 粉星仔 · 画精灵 · 书魔虫 · 棋棋 · 毛头小蛛 · 乖乖鹄 · 果冻 · 墨鱿士
-        </div>
+        <div id="dataStatus" class="data-status">⏳ 正在加载蛋组数据…</div>
         <div class="search-box" style="position: relative;">
-            <input type="text" id="petInput" placeholder="输入宠物名称，例如 粉星仔" autocomplete="off">
-            <button id="searchBtn">查询</button>
-            <button id="randomBtn">🎲 随机一只</button>
-            <a href="stud.html" target="_blank"><button class="btn-gold">🏆 优质种公榜</button></a>
+            <input type="text" id="petInput" placeholder="输入宠物名称，例如 火神" autocomplete="off" disabled>
+            <button id="searchBtn" disabled>查询</button>
+            <button id="randomBtn" disabled>🎲 随机一只</button>
+            <a href="stud.html" target="_blank"><button class="btn-gold" id="studRankBtn" disabled>🏆 优质种公榜</button></a>
         </div>
         <div id="autocompleteList" style="position: relative;"></div>
         <div class="nav-links" style="margin-top: 10px;">
-            <a href="admin.html">📝 数据维护</a>
             <a href="stud-repo.html">📦 种公仓库</a>
+            <span style="color:#6f7c64; font-size:0.8rem; margin-left:8px;">
+                数据来源：<a href="https://wiki.biligame.com/rocom/" target="_blank" style="color:#2b5e2f;">BWIKI</a>
+            </span>
         </div>
     </div>
 
-    <!-- 查询结果卡片（可折叠） -->
+    <!-- 查询结果卡片 -->
     <div class="collapsible" id="resultCollapsible">
         <div class="collapsible-header">
             <span>🔍 查询结果</span>
@@ -240,7 +222,7 @@
         </div>
     </div>
 
-    <!-- 种公匹配面板（可折叠） -->
+    <!-- 种公匹配面板 -->
     <div class="collapsible" id="studMatchCollapsible" style="display: none;">
         <div class="collapsible-header">
             <span>✨ 可与该宠物孵蛋的优质种公</span>
@@ -251,7 +233,7 @@
         </div>
     </div>
 
-    <!-- 蛋组宠物面板（可折叠） -->
+    <!-- 蛋组宠物面板 -->
     <div class="collapsible" id="groupPetsCollapsible" style="display: none;">
         <div class="collapsible-header">
             <span>🐾 该蛋组包含的宠物</span>
@@ -262,7 +244,7 @@
         </div>
     </div>
 
-    <!-- 添加到仓库的弹窗（隐藏） -->
+    <!-- 添加到仓库的弹窗 -->
     <div id="addToGarageModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
         <div style="background:white; border-radius:32px; padding:20px; max-width:90%; width:300px; text-align:center;">
             <h3>添加到种公仓库</h3>
@@ -276,13 +258,10 @@
     </div>
 </div>
 
-<!-- 返回顶部按钮 -->
 <button class="back-to-top" id="backToTopBtn" aria-label="返回顶部">↑</button>
 
-<script src="data.js"></script>
 <script src="common.js"></script>
 <script>
-    refreshData();
     const petInput = document.getElementById('petInput');
     const searchBtn = document.getElementById('searchBtn');
     const randomBtn = document.getElementById('randomBtn');
@@ -299,10 +278,12 @@
     const confirmAddBtn = document.getElementById('confirmAddBtn');
     const cancelAddBtn = document.getElementById('cancelAddBtn');
     const backToTopBtn = document.getElementById('backToTopBtn');
+    const dataStatus = document.getElementById('dataStatus');
 
-    let allPetNames = getAllPetNames();
+    let allPetNames = [];
     let currentSelectedPet = null;
     let selectedNature = null;
+    let dataReady = false;
 
     // 完整30种性格数据
     const NATURE_INFO = {
@@ -319,7 +300,29 @@
     };
     const ALL_NATURES = Object.keys(NATURE_INFO);
 
-    // ---------- 种公仓库数据读取 ----------
+    // ===== 数据加载 =====
+    loadEggData().then(data => {
+        const stats = getTotalStats();
+        dataStatus.className = 'data-status';
+        dataStatus.textContent = `✅ 已加载 ${stats.totalPets} 只宠物 · ${stats.totalGroups} 个蛋组 · 来源 BWIKI`;
+        allPetNames = getAllPetNames();
+        petInput.disabled = false;
+        searchBtn.disabled = false;
+        randomBtn.disabled = false;
+        document.getElementById('studRankBtn').disabled = false;
+        dataReady = true;
+        // 检查 URL 参数自动查询
+        const urlPet = new URLSearchParams(window.location.search).get('pet');
+        if (urlPet) {
+            petInput.value = urlPet;
+            doSearch(urlPet);
+        }
+    }).catch(err => {
+        dataStatus.className = 'data-status error';
+        dataStatus.innerHTML = `❌ 数据加载失败：${escapeHtml(err.message)} <a href="javascript:location.reload()" style="color:#2b5e2f;">重试</a>`;
+    });
+
+    // ===== 种公仓库数据（localStorage） =====
     function loadMyPets() {
         const stored = localStorage.getItem('my_pets');
         if (stored) {
@@ -331,10 +334,9 @@
         localStorage.setItem('my_pets', JSON.stringify(pets));
     }
 
-    // 获取宠物名 -> 性格列表的映射（仓库中该宠物的所有性格）
     function getGaragePetNaturesMap() {
         const pets = loadMyPets();
-        const map = new Map(); // key: petName, value: array of natures
+        const map = new Map();
         for (let pet of pets) {
             if (!map.has(pet.name)) map.set(pet.name, []);
             if (!map.get(pet.name).includes(pet.nature)) {
@@ -347,7 +349,7 @@
     function addToGarage(petName, nature) {
         let myPets = loadMyPets();
         if (myPets.some(p => p.name === petName && p.nature === nature)) {
-            alert(`“${petName} (${nature})” 已在仓库中`);
+            alert(`"${petName} (${nature})" 已在仓库中`);
             return false;
         }
         myPets.push({ name: petName, nature });
@@ -359,7 +361,7 @@
     function showNatureSelector(petName) {
         currentSelectedPet = petName;
         selectedNature = null;
-        modalPetNameSpan.innerHTML = `🐉 <strong>${petName}</strong>`;
+        modalPetNameSpan.innerHTML = `🐉 <strong>${escapeHtml(petName)}</strong>`;
         natureGrid.innerHTML = '';
         ALL_NATURES.forEach(nature => {
             const div = document.createElement('div');
@@ -377,20 +379,14 @@
     }
 
     confirmAddBtn.onclick = () => {
-        if (!selectedNature) {
-            alert('请选择性格');
-            return;
-        }
+        if (!selectedNature) { alert('请选择性格'); return; }
         addToGarage(currentSelectedPet, selectedNature);
         modal.style.display = 'none';
     };
-    cancelAddBtn.onclick = () => {
-        modal.style.display = 'none';
-    };
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.style.display = 'none';
-    });
+    cancelAddBtn.onclick = () => { modal.style.display = 'none'; };
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
 
+    // ===== 工具函数 =====
     function escapeHtml(str) {
         if (!str) return '';
         return str.replace(/[&<>]/g, function(m) {
@@ -401,175 +397,169 @@
         });
     }
 
-    function findMatchStuds(currentPetName, currentPetGroups) {
-        const currentSet = new Set(currentPetGroups);
-        const candidates = [];
-        for (let [key, entry] of petToGroups.entries()) {
-            // if (entry.name === currentPetName) continue;
-            const petGroupsSet = entry.groups;
-            const common = [];
-            for (let g of petGroupsSet) {
-                if (currentSet.has(g)) common.push(g);
-            }
-            if (common.length > 0) {
-                candidates.push({
-                    name: entry.name,
-                    totalGroups: petGroupsSet.size,
-                    commonGroups: common,
-                    matchCount: getPetMatchCount(entry.name)
-                });
-            }
-        }
-        candidates.sort((a,b) => {
-            if (a.matchCount !== b.matchCount) return b.matchCount - a.matchCount;
-            if (a.commonGroups.length !== b.commonGroups.length) return b.commonGroups.length - a.commonGroups.length;
-            return b.totalGroups - a.totalGroups;
-        });
-        return candidates;
-    }
+    // ===== 查询逻辑 =====
+    function doSearch(query) {
+        if (!dataReady) return;
+        const petName = query.trim();
+        if (!petName) return;
 
-    function renderResult(petName) {
-        let groups = getPetGroups(petName);
-        if (!groups.length) {
-            resultBadges.innerHTML = `<div class="not-found">❓ 未找到 “${escapeHtml(petName)}” 的蛋组信息</div>`;
+        const groups = getPetGroups(petName);
+        if (groups.length === 0) {
+            resultBadges.innerHTML = `<p style="text-align:center; padding:1rem; color:#999;">未找到宠物 "${escapeHtml(petName)}"</p>`;
+            resultCollapsible.classList.remove('collapsed');
             studMatchCollapsible.style.display = 'none';
             groupPetsCollapsible.style.display = 'none';
             return;
         }
-        let html = `<div class="pet-title" style="display:flex; justify-content:space-between; align-items:center;">
-                        <span>🐉 宠物：${escapeHtml(petName)}  · 共 ${groups.length} 个蛋组</span>
-                        <button class="add-to-garage-btn" id="addToGarageBtn">📥 添加到仓库</button>
-                    </div><div class="badge-group">`;
-        groups.forEach(group => {
-            html += `<span class="egg-badge" data-group="${escapeHtml(group)}">🧬 ${escapeHtml(group)}</span>`;
+
+        // 显示蛋组
+        const garageMap = getGaragePetNaturesMap();
+        const inGarage = garageMap.has(petName);
+        let html = `<p style="text-align:center; padding:0.5rem;"><strong style="font-size:1.2rem;">🐉 ${escapeHtml(petName)}</strong>`;
+        if (inGarage) {
+            html += `<span class="garage-badge">已有</span>`;
+            const natures = garageMap.get(petName);
+            html += `<span class="garage-natures">${escapeHtml(natures.join('、'))}</span>`;
+        }
+        html += `</p>`;
+        html += `<p style="text-align:center; padding:0.5rem;">`;
+        groups.forEach(g => {
+            if (g === '无法孵蛋') {
+                html += `<span style="background:#eee; color:#999; padding:4px 12px; border-radius:20px; margin:4px; display:inline-block;">${escapeHtml(g)}</span>`;
+            } else {
+                html += `<span style="background:#88b04b; color:white; padding:4px 12px; border-radius:20px; margin:4px; display:inline-block; cursor:pointer;" onclick="showGroupPets('${escapeHtml(g)}')">${escapeHtml(g)}</span>`;
+            }
         });
-        html += `</div>`;
+        if (!inGarage && groups.some(g => g !== '无法孵蛋')) {
+            html += `<button class="add-to-garage-btn" onclick="showNatureSelector('${escapeHtml(petName)}')">➕ 添加到仓库</button>`;
+        }
+        html += `</p>`;
         resultBadges.innerHTML = html;
+        resultCollapsible.classList.remove('collapsed');
 
-        const addBtn = document.getElementById('addToGarageBtn');
-        if (addBtn) addBtn.onclick = () => showNatureSelector(petName);
+        // 种公匹配
+        if (groups.some(g => g !== '无法孵蛋')) {
+            renderStudMatch(petName, groups);
+        } else {
+            studMatchCollapsible.style.display = 'none';
+            groupPetsCollapsible.style.display = 'none';
+        }
+    }
 
-        document.querySelectorAll('.egg-badge').forEach(el => {
-            el.addEventListener('click', (e) => {
-                let groupName = el.getAttribute('data-group');
-                let pets = getPetsByGroup(groupName);
-                groupPetsList.innerHTML = pets.length ? pets.map(p => `<span class="pet-chip">${escapeHtml(p)}</span>`).join('') : '暂无宠物';
-                groupPetsCollapsible.style.display = 'block';
-            });
+    function findMatchStuds(currentPetName, currentPetGroups) {
+        const breedableGroups = currentPetGroups.filter(g => g !== '无法孵蛋');
+        const currentSet = new Set(breedableGroups);
+        const candidates = [];
+        for (let [key, entry] of petToGroups.entries()) {
+            if (entry.name === currentPetName) continue;
+            const common = [];
+            for (let g of entry.groups) {
+                if (currentSet.has(g) && g !== '无法孵蛋') common.push(g);
+            }
+            if (common.length > 0) {
+                candidates.push({
+                    name: entry.name,
+                    matchCount: petMatchCount.get(key) || 0,
+                    commonGroups: common,
+                    allGroups: Array.from(entry.groups).filter(g => g !== '无法孵蛋')
+                });
+            }
+        }
+        candidates.sort((a, b) => {
+            if (a.matchCount !== b.matchCount) return b.matchCount - a.matchCount;
+            if (a.allGroups.length !== b.allGroups.length) return b.allGroups.length - a.allGroups.length;
+            return a.name.localeCompare(b.name, 'zh-CN');
         });
+        return candidates;
+    }
 
-        const matchStuds = findMatchStuds(petName, groups);
+    function renderStudMatch(petName, groups) {
+        const matches = findMatchStuds(petName, groups);
         const garageMap = getGaragePetNaturesMap();
 
-        if (matchStuds.length === 0) {
-            studMatchCollapsible.style.display = 'block';
-            studMatchList.innerHTML = '<div class="no-stud">😢 抱歉，当前数据库中没有与该宠物拥有共同蛋组的其他宠物。<br>你可以通过「数据维护」页面添加更多种公。</div>';
-        } else {
-            studMatchCollapsible.style.display = 'block';
-            let listHtml = '';
-            matchStuds.forEach(stud => {
-                const commonStr = stud.commonGroups.join('、');
-                const inGarage = garageMap.has(stud.name);
-                let garageInfo = '';
-                if (inGarage) {
-                    const natures = garageMap.get(stud.name).join('、');
-                    garageInfo = `<span class="garage-badge" title="已在种公仓库中">🏠 已有</span>
-                                  <span class="garage-natures" title="仓库中的性格">🎭 ${natures}</span>`;
-                }
-                listHtml += `<span class="stud-item" data-pet="${escapeHtml(stud.name)}">
-                                🧬 ${escapeHtml(stud.name)}
-                                <span class="stud-count">${stud.totalGroups}蛋组</span>
-                                <span class="common-groups" title="共同蛋组：${escapeHtml(commonStr)}">🎯 ${stud.commonGroups.length}共同</span>
-                                ${garageInfo}
-                             </span>`;
+        let html = `<p style="padding:0.5rem 1rem; font-size:0.85rem; color:#6f7c64;">共 ${matches.length} 只可配种</p>`;
+        matches.forEach(m => {
+            let tags = '';
+            m.commonGroups.forEach(g => {
+                tags += `<span style="background:#e9f0e6; padding:2px 8px; border-radius:20px; font-size:0.7rem; display:inline-block; margin:2px;">${escapeHtml(g)}</span>`;
             });
-            studMatchList.innerHTML = listHtml;
-            document.querySelectorAll('#studMatchList .stud-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    let pet = item.getAttribute('data-pet');
-                    petInput.value = pet;
-                    renderResult(pet);
-                    autocompleteDiv.innerHTML = '';
-                });
-            });
-        }
-    }
-
-    function showAutocomplete(filter) {
-        autocompleteDiv.innerHTML = '';
-        if (!filter) return;
-        const lowerFilter = filter.toLowerCase();
-        const matches = allPetNames.filter(name => name.toLowerCase().includes(lowerFilter)).slice(0, 10);
-        if (matches.length === 0) return;
-        const container = document.createElement('div');
-        container.className = 'autocomplete-items';
-        matches.forEach(match => {
-            const item = document.createElement('div');
-            item.className = 'autocomplete-item';
-            item.textContent = match;
-            item.addEventListener('click', () => {
-                petInput.value = match;
-                renderResult(match);
-                autocompleteDiv.innerHTML = '';
-            });
-            container.appendChild(item);
+            let garageInfo = '';
+            if (garageMap.has(m.name)) {
+                garageInfo = `<span class="garage-badge">已有</span><span class="garage-natures">${escapeHtml(garageMap.get(m.name).join('、'))}</span>`;
+            }
+            html += `<div style="display:flex; align-items:center; padding:6px 12px; border-bottom:1px solid #f0f0f0;">
+                <strong style="flex:1;">${escapeHtml(m.name)}</strong>
+                <span style="color:#c97e0a; font-weight:bold; margin-right:8px;">✨ ${m.matchCount}</span>
+                ${garageInfo}
+                <button class="add-to-garage-btn" onclick="showNatureSelector('${escapeHtml(m.name)}')">➕</button>
+            </div>`;
         });
-        autocompleteDiv.appendChild(container);
+        studMatchList.innerHTML = html;
+        studMatchCollapsible.style.display = '';
     }
 
-    function randomPet() {
-        if (allPetNames.length === 0) return;
-        let rand = allPetNames[Math.floor(Math.random() * allPetNames.length)];
-        petInput.value = rand;
-        renderResult(rand);
+    function showGroupPets(groupName) {
+        const pets = getPetsByGroup(groupName);
+        const garageMap = getGaragePetNaturesMap();
+        let html = `<p style="padding:0.5rem 1rem; font-weight:bold;">${escapeHtml(groupName)}（${pets.length} 只）</p>`;
+        pets.forEach(p => {
+            let garageInfo = '';
+            if (garageMap.has(p)) {
+                garageInfo = `<span class="garage-badge">已有</span>`;
+            }
+            html += `<div style="display:inline-block; background:#e9f0e6; border-radius:40px; padding:6px 16px; margin:6px; font-size:0.85rem;">
+                ${escapeHtml(p)} ${garageInfo}
+                <button class="add-to-garage-btn" style="margin-left:4px; padding:2px 10px; font-size:0.75rem;" onclick="showNatureSelector('${escapeHtml(p)}')">➕</button>
+            </div>`;
+        });
+        groupPetsList.innerHTML = html;
+        groupPetsCollapsible.style.display = '';
+        groupPetsCollapsible.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // 返回顶部逻辑
-    function handleBackToTop() {
+    // ===== 联想输入 =====
+    petInput.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        if (query.length === 0) { autocompleteDiv.innerHTML = ''; return; }
+        const matches = allPetNames.filter(n => n.toLowerCase().includes(query)).slice(0, 8);
+        if (matches.length === 0) { autocompleteDiv.innerHTML = ''; return; }
+        autocompleteDiv.innerHTML = matches.map(m => 
+            `<div style="padding:8px 16px; cursor:pointer; background:#fff; border-bottom:1px solid #eee;" 
+                  onmousedown="petInput.value='${escapeHtml(m)}'; autocompleteDiv.innerHTML=''; doSearch('${escapeHtml(m)}');">
+                ${escapeHtml(m)}
+            </div>`
+        ).join('');
+    });
+
+    // 点击外部关闭联想
+    document.addEventListener('click', function(e) {
+        if (e.target !== petInput) autocompleteDiv.innerHTML = '';
+    });
+
+    // ===== 事件绑定 =====
+    searchBtn.addEventListener('click', () => doSearch(petInput.value));
+    petInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doSearch(petInput.value); });
+    randomBtn.addEventListener('click', () => {
+        if (!dataReady) return;
+        const random = allPetNames[Math.floor(Math.random() * allPetNames.length)];
+        petInput.value = random;
+        doSearch(random);
+    });
+
+    // 折叠
+    document.querySelectorAll('.collapsible-header').forEach(header => {
+        header.addEventListener('click', function() {
+            this.parentElement.classList.toggle('collapsed');
+        });
+    });
+
+    // 返回顶部
+    window.addEventListener('scroll', () => {
+        backToTopBtn.classList.toggle('show', window.scrollY > 300);
+    });
+    backToTopBtn.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    function toggleBackToTopButton() {
-        if (window.scrollY > 200) {
-            backToTopBtn.classList.add('show');
-        } else {
-            backToTopBtn.classList.remove('show');
-        }
-    }
-    backToTopBtn.addEventListener('click', handleBackToTop);
-    window.addEventListener('scroll', toggleBackToTopButton);
-    toggleBackToTopButton(); // 初始检查
-
-    petInput.addEventListener('input', (e) => showAutocomplete(e.target.value));
-    petInput.addEventListener('blur', () => setTimeout(() => { autocompleteDiv.innerHTML = ''; }, 200));
-    searchBtn.addEventListener('click', () => {
-        let val = petInput.value.trim();
-        if (val) renderResult(val);
-        autocompleteDiv.innerHTML = '';
     });
-    randomBtn.addEventListener('click', randomPet);
-    petInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') searchBtn.click();
-    });
-
-    function initCollapsible() {
-        document.querySelectorAll('.collapsible').forEach(card => {
-            const header = card.querySelector('.collapsible-header');
-            if (!header) return;
-            header.addEventListener('click', () => card.classList.toggle('collapsed'));
-        });
-    }
-    initCollapsible();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const petParam = urlParams.get('pet');
-    if (petParam) {
-        petInput.value = petParam;
-        renderResult(petParam);
-    } else if (allPetNames.length) {
-        let defaultPet = allPetNames.find(n => n.includes('粉星仔')) || allPetNames[0];
-        petInput.value = defaultPet;
-        renderResult(defaultPet);
-    }
 </script>
 </body>
 </html>

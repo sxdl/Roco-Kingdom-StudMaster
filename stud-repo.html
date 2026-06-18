@@ -218,13 +218,13 @@
 <div class="container">
     <div class="hero">
         <div style="text-align:center; font-size:0.7rem; padding: 1rem; color: #6f7c64;">
-        🧪 非商用工具 | 数据基于洛克王国 | 禁止用于盈利性目的
+        🧪 非商用工具 | 数据基于洛克王国BWIKI | 禁止用于盈利性目的
         </div>
         <h1>📦 种公仓库 · 蛋组 & 性格覆盖分析</h1>
         <div class="nav-links">
             <a href="index.html">← 返回查询</a>
             <a href="stud.html">🏆 种公排行榜</a>
-            <a href="admin.html">📝 数据维护</a>
+            <span style="color:#6f7c64; font-size:0.8rem;">数据来源：<a href="https://wiki.biligame.com/rocom/" target="_blank" style="color:#2b5e2f;">BWIKI</a></span>
         </div>
     </div>
 
@@ -253,6 +253,7 @@
         <a href="index.html">➕ 返回主页添加宠物</a>
     </div>
 
+    <div id="dataStatus" class="data-status" style="text-align:center; font-size:0.75rem; color:#6f7c64; padding:4px;">⏳ 正在加载蛋组数据…</div>
     <h3>🗂️ 各蛋组覆盖情况（点击跳转）</h3>
     <div id="groupCoverage" class="coverage-grid"></div>
 
@@ -262,13 +263,12 @@
 <!-- 返回顶部按钮 -->
 <button class="back-to-top" id="backToTopBtn" aria-label="返回顶部">↑</button>
 
-<script src="data.js"></script>
 <script src="common.js"></script>
 <script>
-    refreshData();
     let myPets = [];
     let eggGroups = [];
     let currentSelectedNatures = [];
+    let dataReady = false;
 
     // 性格数据（仅用于提示）
     const NATURE_INFO = {
@@ -305,8 +305,7 @@
 
     function getEggGroups() {
         if (eggGroups.length) return eggGroups;
-        const data = getCurrentData();
-        eggGroups = data.eggGroups;
+        eggGroups = getAllEggGroups();
         return eggGroups;
     }
 
@@ -559,7 +558,17 @@
         renderAnalysis();
     });
 
-    loadMyPets();
+    // 加载蛋组数据后初始化仓库
+    loadEggData().then(data => {
+        const stats = getTotalStats();
+        document.getElementById('dataStatus').textContent = `✅ 已加载 ${stats.totalPets} 只宠物 · ${stats.totalGroups} 个蛋组 · 来源 BWIKI`;
+        dataReady = true;
+        loadMyPets();
+    }).catch(err => {
+        document.getElementById('dataStatus').className = 'data-status';
+        document.getElementById('dataStatus').style.color = '#d9534f';
+        document.getElementById('dataStatus').innerHTML = `❌ 数据加载失败：${err.message} <a href="javascript:location.reload()" style="color:#2b5e2f;">重试</a>`;
+    });
 </script>
 </body>
 </html>

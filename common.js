@@ -1,71 +1,129 @@
-// 存储键名
-const STORAGE_KEY = 'egg_group_data';
+// common.js - 洛克王国宠物蛋组数据引擎（Bwiki 实时数据版）
+// 数据来源：Bwiki MediaWiki:Egg.json（实时拉取，无需手动更新）
 
-// 初始化数据
-function initData() {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-        const initialData = { eggGroups: EGG_GROUPS, tableData: TABLE_DATA };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialData));
-        return initialData;
-    }
-    return JSON.parse(localStorage.getItem(STORAGE_KEY));
+const BWIKI_EGG_JSON_URL = 'https://wiki.biligame.com/rocom/index.php?title=MediaWiki:Egg.json&action=raw';
+const BWIKI_CACHE_KEY = 'bwiki_egg_cache';
+const BWIKI_CACHE_TS_KEY = 'bwiki_egg_ts';
+const CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // 6小时缓存，避免频繁请求
+
+// ===== 全局状态 =====
+let eggDataList = [];         // 原始 JSON 数组 [{id, name, eggGroups[]}]
+let petToGroups = new Map();  // name.lower -> { id, name, groups: Set }
+let groupToPets = new Map(); // 蛋组名 -> Set(name)
+let petMatchCount = new Map();// name.lower -> 可配种宠物总数
+
+// ===== 数据加载 =====
+function loadEggData() {
+    return new Promise((resolve, reject) => {
+        // 尝试从缓存读取
+        try {
+            const cached = localStorage.getItem(BWIKI_CACHE_KEY);
+            const ts = parseInt(localStorage.getItem(BWIKI_CACHE_TS_KEY) || '0');
+            if (cached && (Date.now() - ts) < CACHE_DURATION_MS) {
+                eggDataList = JSON.parse(cached);
+                buildMappings();
+                resolve(eggDataList);
+                // 后台静默刷新（不阻塞 UI）
+                fetchEggDataFromWiki().then(() => {}).catch(() => {});
+                return;
+            }
+        } catch (e) {}
+
+        // 缓存过期或不存在，从 wiki 拉取
+        fetchEggDataFromWiki().then(resolve).catch(reject);
+    });
 }
 
-function getCurrentData() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY));
+function fetchEggDataFromWiki() {
+    return fetch(BWIKI_EGG_JSON_URL)
+        .then(res => {
+            if (!res.ok) throw new Error('Bwiki 数据请求失败: ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            eggDataList = data;
+            // 写入缓存
+            try {
+                localStorage.setItem(BWIKI_CACHE_KEY, JSON.stringify(data));
+                localStorage.setItem(BWIKI_CACHE_TS_KEY, String(Date.now()));
+            } catch (e) {}
+            buildMappings();
+            return data;
+        });
 }
 
-function saveData(eggGroups, tableData) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ eggGroups, tableData }));
+// 强制刷新数据（绕过缓存）
+function forceRefreshData() {
+    return fetchEggDataFromWiki();
 }
 
-let petToGroups = new Map();      // 宠物小写 -> { name, groups: Set }
-let groupToPets = new Map();      // 蛋组名 -> Set(宠物名)
-let petMatchCount = new Map();    // 宠物名小写 -> 可配种宠物总数（并集去重减自身）
-
-function buildMappingsFromData(data) {
-    const { eggGroups, tableData } = data;
+// ===== 构建映射 =====
+function buildMappings() {
     petToGroups.clear();
     groupToPets.clear();
-    for (let g of eggGroups) groupToPets.set(g, new Set());
-
-    for (let row of tableData) {
-        for (let colIdx = 0; colIdx < eggGroups.length; colIdx++) {
-            let pet = row[colIdx];
-            if (!pet || pet.trim() === "") continue;
-            let group = eggGroups[colIdx];
-            let petKey = pet.trim();
-            let lowerKey = petKey.toLowerCase();
-
-            if (!petToGroups.has(lowerKey)) {
-                petToGroups.set(lowerKey, { name: petKey, groups: new Set() });
-            }
-            petToGroups.get(lowerKey).groups.add(group);
-            groupToPets.get(group).add(petKey);
-        }
-    }
-
-    // 预计算可配种宠物总数（每个宠物的所有蛋组下的宠物并集，减去自身）
     petMatchCount.clear();
-    for (let [lowerKey, entry] of petToGroups.entries()) {
-        const groups = entry.groups;
-        const allPets = new Set();
-        for (let g of groups) {
-            const petsInGroup = groupToPets.get(g);
-            if (petsInGroup) {
-                for (let p of petsInGroup) allPets.add(p);
+
+    // 收集所有蛋组名
+    const allGroups = new Set();
+    for (let item of eggDataList) {
+        for (let g of (item.eggGroups || [])) {
+            allGroups.add(g);
+        }
+    }
+    for (let g of allGroups) groupToPets.set(g, new Set());
+
+    // 映射：宠物名 -> 蛋组集合
+    // 同名宠物（不同形态）共享蛋组（合并）
+    for (let item of eggDataList) {
+        let name = (item.name || '').trim();
+        if (!name) continue;
+        let lower = name.toLowerCase();
+
+        if (!petToGroups.has(lower)) {
+            petToGroups.set(lower, { id: item.id, name: name, groups: new Set() });
+        }
+        // 如果当前条目有 id 且 id 更小（更早编号），更新 id
+        let entry = petToGroups.get(lower);
+        if (item.id && (!entry.id || item.id < entry.id)) {
+            entry.id = item.id;
+        }
+        if (item.name === name) {
+            entry.name = name; // 保留不带括号的名称
+        }
+
+        for (let g of (item.eggGroups || [])) {
+            entry.groups.add(g);
+            if (groupToPets.has(g)) {
+                groupToPets.get(g).add(name);
             }
         }
-        allPets.delete(entry.name); // 移除自身
-        petMatchCount.set(lowerKey, allPets.size);
+    }
+
+    // 优先使用不带括号的名称（最小形态名称）
+    for (let [lower, entry] of petToGroups.entries()) {
+        if (lower.includes('（') || lower.includes('(')) continue; // 已是非括号版本
+        // 检查是否有括号版本
+        let baseName = entry.name;
+        // 保留原来的名字
+    }
+
+    // 预计算可配种宠物总数
+    for (let [lower, entry] of petToGroups.entries()) {
+        const allPets = new Set();
+        for (let g of entry.groups) {
+            if (g === '无法孵蛋') continue;
+            const pets = groupToPets.get(g);
+            if (pets) {
+                for (let p of pets) {
+                    if (p !== entry.name) allPets.add(p);
+                }
+            }
+        }
+        petMatchCount.set(lower, allPets.size);
     }
 }
 
-function refreshData() {
-    const data = getCurrentData();
-    buildMappingsFromData(data);
-}
-
+// ===== 查询接口 =====
 function getPetGroups(petName) {
     const lower = petName.toLowerCase();
     const entry = petToGroups.get(lower);
@@ -73,11 +131,9 @@ function getPetGroups(petName) {
 }
 
 function getAllPetNames() {
-    const names = new Set();
-    for (let entry of petToGroups.values()) {
-        names.add(entry.name);
-    }
-    return Array.from(names).sort((a,b) => a.localeCompare(b));
+    return Array.from(petToGroups.values())
+        .map(e => e.name)
+        .sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
 function getPetMatchCount(petName) {
@@ -85,21 +141,28 @@ function getPetMatchCount(petName) {
     return petMatchCount.get(lower) || 0;
 }
 
+function getPetsByGroup(groupName) {
+    const set = groupToPets.get(groupName);
+    return set ? Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN')) : [];
+}
+
+function getAllEggGroups() {
+    return Array.from(groupToPets.keys()).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+}
+
 function getStudRanking() {
     const list = [];
-    for (let [lowerKey, entry] of petToGroups.entries()) {
-        const groupsCount = entry.groups.size;
-        // 只保留至少两个蛋组的宠物（种公门槛）
-        if (groupsCount < 2) continue;
-        const matchCount = petMatchCount.get(lowerKey) || 0;
+    for (let [lower, entry] of petToGroups.entries()) {
+        const groups = Array.from(entry.groups).filter(g => g !== '无法孵蛋');
+        if (groups.length < 2) continue;
+        const matchCount = petMatchCount.get(lower) || 0;
         list.push({
             name: entry.name,
-            groupsCount: groupsCount,
+            groupsCount: groups.length,
             matchCount: matchCount,
-            groups: Array.from(entry.groups)
+            groups: groups
         });
     }
-    // 排序：先按可配种宠物总数降序，再按自身蛋组数降序
     list.sort((a, b) => {
         if (a.matchCount !== b.matchCount) return b.matchCount - a.matchCount;
         return b.groupsCount - a.groupsCount;
@@ -107,40 +170,14 @@ function getStudRanking() {
     return list;
 }
 
-function getPetsByGroup(groupName) {
-    const set = groupToPets.get(groupName);
-    return set ? Array.from(set).sort() : [];
+function getTotalStats() {
+    let totalPets = petToGroups.size;
+    let totalGroups = groupToPets.size;
+    return { totalPets, totalGroups };
 }
 
-// CSV 导出（基于当前数据，不依赖映射）
-function exportToCSV() {
-    const data = getCurrentData();
-    const { eggGroups, tableData } = data;
-    const rows = [eggGroups];
-    for (let row of tableData) {
-        const fullRow = row.slice();
-        while (fullRow.length < eggGroups.length) fullRow.push('');
-        rows.push(fullRow);
-    }
-    return rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+// ===== 导出（保留用于种公仓库备份） =====
+function exportStudData() {
+    const stored = localStorage.getItem('my_pets');
+    return stored || '[]';
 }
-
-function importFromCSV(csvText) {
-    const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== '');
-    if (lines.length < 2) throw new Error('CSV至少包含表头+一行数据');
-    const parseRow = (line) => {
-        return line.split(',').map(cell => cell.replace(/^"|"$/g, '').replace(/""/g, '"'));
-    };
-    const header = parseRow(lines[0]);
-    const dataRows = lines.slice(1).map(parseRow);
-    const maxCols = header.length;
-    const tableData = dataRows.map(row => {
-        const newRow = [...row];
-        while (newRow.length < maxCols) newRow.push('');
-        return newRow;
-    });
-    return { eggGroups: header, tableData };
-}
-
-initData();
-refreshData();

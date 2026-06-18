@@ -6,76 +6,48 @@
     <title>优质种公排行榜 · 配种广度优先</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        .ranking-table th, .ranking-table td {
-            text-align: left;
-            padding: 10px 12px;
-        }
-        .match-count {
-            font-weight: bold;
-            color: #c97e0a;
-        }
-        .groups-count {
-            color: #2b5e2f;
-        }
+        .ranking-table th, .ranking-table td { text-align: left; padding: 10px 12px; }
+        .match-count { font-weight: bold; color: #c97e0a; }
+        .groups-count { color: #2b5e2f; }
         .pagination {
-            margin-top: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
+            margin-top: 20px; display: flex; justify-content: center;
+            align-items: center; gap: 12px; flex-wrap: wrap;
         }
         .pagination button, .pagination select {
-            padding: 6px 12px;
-            border-radius: 40px;
-            border: 1px solid #cbdcc2;
-            background: white;
-            cursor: pointer;
-            font-family: inherit;
+            padding: 6px 12px; border-radius: 40px; border: 1px solid #cbdcc2;
+            background: white; cursor: pointer; font-family: inherit;
         }
-        .pagination button:hover {
-            background: #eef5e8;
-        }
-        .pagination .active-page {
-            background: #2b5e2f;
-            color: white;
-            border-color: #2b5e2f;
-        }
-        .page-size-selector {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-left: 20px;
-        }
-        .info-text {
-            margin-top: 10px;
-            text-align: center;
-            font-size: 0.8rem;
-            color: #6f7c64;
-        }
+        .pagination button:hover { background: #eef5e8; }
+        .pagination .active-page { background: #2b5e2f; color: white; border-color: #2b5e2f; }
+        .page-size-selector { display: inline-flex; align-items: center; gap: 8px; margin-left: 20px; }
+        .info-text { margin-top: 10px; text-align: center; font-size: 0.8rem; color: #6f7c64; }
+        .data-status { text-align: center; font-size: 0.75rem; color: #6f7c64; padding: 4px; }
+        .data-status.error { color: #d9534f; }
     </style>
 </head>
 <body>
 <div class="container">
     <div style="text-align:center; font-size:0.7rem; padding: 1rem; color: #6f7c64;">
-    🧪 非商用工具 | 数据基于洛克王国 | 禁止用于盈利性目的
+    🧪 非商用工具 | 数据基于洛克王国BWIKI | 禁止用于盈利性目的
     </div>
     <h1>🏆 优质种公排行榜</h1>
-    <p>⚡ 排序规则：<strong>可配种宠物总数</strong>（能与之孵蛋的不同宠物数量）越多越优质，同等条件下蛋组数量越多越优。</p>
+    <p>⚡ 排序规则：<strong>可配种宠物总数</strong>越多越优质，同等条件下蛋组数量越多越优。</p>
     <p>📌 仅统计拥有 <strong>至少2个蛋组</strong> 的宠物（单蛋组不视为种公）。</p>
+    <div id="dataStatus" class="data-status">⏳ 正在加载蛋组数据…</div>
     <div class="nav-links">
         <a href="index.html">← 返回查询</a>
-        <a href="admin.html">📝 数据维护</a>
+        <a href="stud-repo.html">📦 种公仓库</a>
+        <span style="color:#6f7c64; font-size:0.8rem;">
+            数据来源：<a href="https://wiki.biligame.com/rocom/" target="_blank" style="color:#2b5e2f;">BWIKI</a>
+        </span>
     </div>
     <table class="ranking-table" id="rankingTable">
         <thead>
-            <tr><th>#</th><th>宠物名</th><th>可配种宠物总数</th><th>自身蛋组数</th><th>具体蛋组</th>
+            <tr><th>#</th><th>宠物名</th><th>可配种宠物总数</th><th>自身蛋组数</th><th>具体蛋组</th></tr>
         </thead>
         <tbody id="rankingBody"></tbody>
     </table>
-
-    <!-- 分页控件 -->
-    <div class="pagination" id="paginationControls">
+    <div class="pagination" id="paginationControls" style="display:none;">
         <button id="firstPageBtn" title="首页">⏮️</button>
         <button id="prevPageBtn" title="上一页">◀</button>
         <span id="pageNumbers"></span>
@@ -93,14 +65,13 @@
     </div>
     <div class="info-text" id="rangeInfo"></div>
 </div>
-<script src="data.js"></script>
 <script src="common.js"></script>
 <script>
-    refreshData();          // 确保映射最新
-    let ranking = getStudRanking();  // 已过滤蛋组数≥2并按 matchCount + groupsCount 排序
+    let ranking = [];
     let currentPage = 1;
-    let pageSize = 15;      // 默认每页15条
+    let pageSize = 15;
     let totalPages = 1;
+    let dataReady = false;
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -111,6 +82,18 @@
             return m;
         });
     }
+
+    loadEggData().then(data => {
+        const stats = getTotalStats();
+        document.getElementById('dataStatus').className = 'data-status';
+        document.getElementById('dataStatus').textContent = `✅ 已加载 ${stats.totalPets} 只宠物 · 来源 BWIKI`;
+        ranking = getStudRanking();
+        dataReady = true;
+        renderTable();
+    }).catch(err => {
+        document.getElementById('dataStatus').className = 'data-status error';
+        document.getElementById('dataStatus').innerHTML = `❌ 数据加载失败：${escapeHtml(err.message)} <a href="javascript:location.reload()" style="color:#2b5e2f;">重试</a>`;
+    });
 
     function renderTable() {
         const tbody = document.getElementById('rankingBody');
@@ -123,10 +106,8 @@
 
         let start = (currentPage - 1) * pageSize;
         let end = start + pageSize;
-        if (pageSize === 'all') {
-            start = 0;
-            end = ranking.length;
-        } else {
+        if (pageSize === 'all') { start = 0; end = ranking.length; }
+        else {
             if (start >= ranking.length) {
                 currentPage = Math.max(1, Math.ceil(ranking.length / pageSize));
                 start = (currentPage - 1) * pageSize;
@@ -149,7 +130,6 @@
         });
         tbody.innerHTML = html;
 
-        // 绑定点击行事件
         document.querySelectorAll('.pet-row').forEach(row => {
             row.addEventListener('click', () => {
                 let pet = row.getAttribute('data-pet');
@@ -157,34 +137,26 @@
             });
         });
 
-        // 更新分页信息
         updatePaginationInfo();
         renderPageNumbers();
     }
 
     function updatePaginationInfo() {
         let total = ranking.length;
-        let start, end;
         if (pageSize === 'all') {
-            start = 1;
-            end = total;
             document.getElementById('rangeInfo').innerHTML = `显示第 1 - ${total} 条，共 ${total} 条`;
             return;
         }
-        start = (currentPage - 1) * pageSize + 1;
-        end = Math.min(currentPage * pageSize, total);
+        let start = (currentPage - 1) * pageSize + 1;
+        let end = Math.min(currentPage * pageSize, total);
         document.getElementById('rangeInfo').innerHTML = `显示第 ${start} - ${end} 条，共 ${total} 条`;
     }
 
     function renderPageNumbers() {
-        if (pageSize === 'all') {
-            document.getElementById('pageNumbers').innerHTML = '';
-            return;
-        }
+        if (pageSize === 'all') { document.getElementById('pageNumbers').innerHTML = ''; return; }
         totalPages = Math.ceil(ranking.length / pageSize);
         const container = document.getElementById('pageNumbers');
         container.innerHTML = '';
-        // 显示最多 7 个页码（当前页前后各3个）
         let startPage = Math.max(1, currentPage - 3);
         let endPage = Math.min(totalPages, currentPage + 3);
         if (endPage - startPage < 6) {
@@ -195,61 +167,21 @@
             const btn = document.createElement('button');
             btn.textContent = i;
             if (i === currentPage) btn.classList.add('active-page');
-            btn.addEventListener('click', () => {
-                currentPage = i;
-                renderTable();
-            });
+            btn.addEventListener('click', () => { currentPage = i; renderTable(); });
             container.appendChild(btn);
         }
     }
 
-    function goFirstPage() {
-        if (pageSize === 'all') return;
+    document.getElementById('firstPageBtn').addEventListener('click', () => { if (pageSize !== 'all') { currentPage = 1; renderTable(); } });
+    document.getElementById('prevPageBtn').addEventListener('click', () => { if (pageSize !== 'all' && currentPage > 1) { currentPage--; renderTable(); } });
+    document.getElementById('nextPageBtn').addEventListener('click', () => { if (pageSize !== 'all' && currentPage < totalPages) { currentPage++; renderTable(); } });
+    document.getElementById('lastPageBtn').addEventListener('click', () => { if (pageSize !== 'all') { currentPage = totalPages; renderTable(); } });
+    document.getElementById('pageSizeSelect').addEventListener('change', function() {
+        let v = this.value;
+        pageSize = v === 'all' ? 'all' : parseInt(v, 10);
         currentPage = 1;
         renderTable();
-    }
-    function goPrevPage() {
-        if (pageSize === 'all') return;
-        if (currentPage > 1) {
-            currentPage--;
-            renderTable();
-        }
-    }
-    function goNextPage() {
-        if (pageSize === 'all') return;
-        if (currentPage < totalPages) {
-            currentPage++;
-            renderTable();
-        }
-    }
-    function goLastPage() {
-        if (pageSize === 'all') return;
-        currentPage = totalPages;
-        renderTable();
-    }
-    function changePageSize() {
-        const select = document.getElementById('pageSizeSelect');
-        let newSize = select.value;
-        if (newSize === 'all') {
-            pageSize = 'all';
-            currentPage = 1;
-            renderTable();
-        } else {
-            pageSize = parseInt(newSize, 10);
-            currentPage = 1;
-            renderTable();
-        }
-    }
-
-    // 绑定事件
-    document.getElementById('firstPageBtn').addEventListener('click', goFirstPage);
-    document.getElementById('prevPageBtn').addEventListener('click', goPrevPage);
-    document.getElementById('nextPageBtn').addEventListener('click', goNextPage);
-    document.getElementById('lastPageBtn').addEventListener('click', goLastPage);
-    document.getElementById('pageSizeSelect').addEventListener('change', changePageSize);
-
-    // 初始化渲染
-    renderTable();
+    });
 </script>
 </body>
 </html>
