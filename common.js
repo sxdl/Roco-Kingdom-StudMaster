@@ -1,19 +1,11 @@
-// common.js - 洛克王国宠物蛋组数据引擎（BWIKI 数据版）
-// 数据来源：Bwiki MediaWiki:Egg.json
-// 策略：内置 fallback 数据保证可用，后台尝试 CORS 代理拉取最新版本
+// common.js - 洛克王国宠物蛋组数据引擎（BWIKI 实时数据版）
+// 数据来源：BWIKI MediaWiki API（origin=* 解决 CORS）
+// 策略：每次加载 fetch 最新数据，缓存 6 小时
 
-const BWIKI_CACHE_KEY = 'bwiki_egg_cache';
-const BWIKI_CACHE_TS_KEY = 'bwiki_egg_ts';
-const BWIKI_CACHE_VERSION_KEY = 'bwiki_egg_version';
-const BWIKI_VERSION = '2026-06-18';
+const BWIKI_API_URL = 'https://wiki.biligame.com/rocom/api.php?action=query&titles=MediaWiki:Egg.json&prop=revisions&rvprop=content&format=json&origin=*';
+const CACHE_KEY = 'bwiki_egg_data';
+const CACHE_TS_KEY = 'bwiki_egg_ts';
 const CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // 6小时
-
-// CORS 代理列表（依次尝试）
-const CORS_PROXIES = [
-    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-];
-const BWIKI_EGG_JSON_URL = 'https://wiki.biligame.com/rocom/index.php?title=MediaWiki:Egg.json&action=raw';
 
 // ===== 全局状态 =====
 let eggDataList = [];
@@ -21,86 +13,54 @@ let petToGroups = new Map();
 let groupToPets = new Map();
 let petMatchCount = new Map();
 
-// ===== 数据加载（入口） =====
+// ===== 数据加载 =====
 function loadEggData() {
     return new Promise((resolve, reject) => {
-        // 1. 尝试从缓存读取
+        // 1. 有有效缓存则直接用
         try {
-            const cached = localStorage.getItem(BWIKI_CACHE_KEY);
-            const ts = parseInt(localStorage.getItem(BWIKI_CACHE_TS_KEY) || '0');
-            const ver = localStorage.getItem(BWIKI_CACHE_VERSION_KEY) || '';
-            if (cached && ver === BWIKI_VERSION && (Date.now() - ts) < CACHE_DURATION_MS) {
+            const cached = localStorage.getItem(CACHE_KEY);
+            const ts = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0');
+            if (cached && (Date.now() - ts) < CACHE_DURATION_MS) {
                 eggDataList = JSON.parse(cached);
                 buildMappings();
                 resolve(eggDataList);
-                return; // 缓存有效，不后台刷新（版本未变）
-            }
-            if (cached && ver !== BWIKI_VERSION) {
-                // 版本变了，先尝试更新
-                tryFetchLatest().then(data => {
-                    resolve(data);
-                }).catch(() => {
-                    // 网络失败但本地有旧数据，先用旧数据
-                    eggDataList = JSON.parse(cached);
-                    buildMappings();
-                    resolve(eggDataList);
-                });
+                // 后台静默刷新
+                fetchFromWiki().catch(() => {});
                 return;
             }
         } catch (e) {}
 
-        // 2. 缓存无效，尝试在线拉取
-        tryFetchLatest().then(data => {
-            resolve(data);
-        }).catch(() => {
-            // 3. 网络失败，使用内置 fallback
-            eggDataList = FALLBACK_EGG_DATA;
-            buildMappings();
-            resolve(eggDataList);
-        });
+        // 2. 缓存过期，在线拉取
+        fetchFromWiki().then(resolve).catch(reject);
     });
 }
 
-function tryFetchLatest() {
-    // 直接请求 BWIKI（可能被 CORS 拦截）
-    return tryFetchUrl(BWIKI_EGG_JSON_URL).catch(() => {
-        // 直接失败，尝试 CORS 代理
-        return tryCorsProxies();
-    }).then(data => {
-        if (Array.isArray(data) && data.length > 0 && data[0].eggGroups) {
-            eggDataList = data;
-            try {
-                localStorage.setItem(BWIKI_CACHE_KEY, JSON.stringify(data));
-                localStorage.setItem(BWIKI_CACHE_TS_KEY, String(Date.now()));
-                localStorage.setItem(BWIKI_CACHE_VERSION_KEY, BWIKI_VERSION);
-            } catch (e) {}
-            buildMappings();
-            return data;
-        } else {
-            throw new Error('数据格式无效');
-        }
-    });
-}
-
-function tryFetchUrl(url) {
-    return fetch(url, { cache: 'no-cache' })
+function fetchFromWiki() {
+    return fetch(BWIKI_API_URL)
         .then(res => {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.json();
+        })
+        .then(apiResult => {
+            const pages = apiResult.query.pages;
+            let content = null;
+            for (let pid in pages) {
+                if (pages[pid].revisions) {
+                    content = pages[pid].revisions[0]['*'];
+                    break;
+                }
+            }
+            if (!content) throw new Error('未找到 Egg.json 页面内容');
+            const data = JSON.parse(content);
+            eggDataList = data;
+            // 写入缓存
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+                localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+            } catch (e) {}
+            buildMappings();
+            return data;
         });
-}
-
-function tryCorsProxies() {
-    let chain = Promise.reject(new Error('无可用代理'));
-    for (const makeUrl of CORS_PROXIES) {
-        chain = chain.catch(() => tryFetchUrl(makeUrl(BWIKI_EGG_JSON_URL)));
-    }
-    return chain;
-}
-
-// 强制刷新（绕过缓存）
-function forceRefreshData() {
-    return tryFetchLatest();
 }
 
 // ===== 构建映射 =====
@@ -130,7 +90,6 @@ function buildMappings() {
         }
     }
 
-    // 可配种总数
     for (let [lower, entry] of petToGroups.entries()) {
         const allPets = new Set();
         for (let g of entry.groups) {
