@@ -336,12 +336,11 @@
 
     function getGaragePetNaturesMap() {
         const pets = loadMyPets();
-        const map = new Map(); // baseName -> [natures]
+        const map = new Map();
         for (let pet of pets) {
-            let base = getPetBaseName(pet.name);
-            if (!map.has(base)) map.set(base, []);
-            if (!map.get(base).includes(pet.nature)) {
-                map.get(base).push(pet.nature);
+            if (!map.has(pet.name)) map.set(pet.name, []);
+            if (!map.get(pet.name).includes(pet.nature)) {
+                map.get(pet.name).push(pet.nature);
             }
         }
         return map;
@@ -349,10 +348,8 @@
 
     function addToGarage(petName, nature) {
         let myPets = loadMyPets();
-        // 按基础名检查：同家族同性格视为已有
-        let base = getPetBaseName(petName);
-        if (myPets.some(p => getPetBaseName(p.name) === base && p.nature === nature)) {
-            alert(`"${base} (${nature})" 已在仓库中`);
+        if (myPets.some(p => p.name === petName && p.nature === nature)) {
+            alert(`"${petName} (${nature})" 已在仓库中`);
             return false;
         }
         myPets.push({ name: petName, nature });
@@ -417,12 +414,11 @@
 
         // 显示蛋组
         const garageMap = getGaragePetNaturesMap();
-        const base = getPetBaseName(petName);
-        const inGarage = garageMap.has(base);
+        const inGarage = garageMap.has(petName);
         let html = `<p style="text-align:center; padding:0.5rem;"><strong style="font-size:1.2rem;">🐉 ${escapeHtml(petName)}</strong>`;
         if (inGarage) {
             html += `<span class="garage-badge">已有</span>`;
-            const natures = garageMap.get(base);
+            const natures = garageMap.get(petName);
             html += `<span class="garage-natures">${escapeHtml(natures.join('、'))}</span>`;
         }
         html += `</p>`;
@@ -488,9 +484,8 @@
                 tags += `<span style="background:#e9f0e6; padding:2px 8px; border-radius:20px; font-size:0.7rem; display:inline-block; margin:2px;">${escapeHtml(g)}</span>`;
             });
             let garageInfo = '';
-            let mBase = getPetBaseName(m.name);
-            if (garageMap.has(mBase)) {
-                garageInfo = `<span class="garage-badge">已有</span><span class="garage-natures">${escapeHtml(garageMap.get(mBase).join('、'))}</span>`;
+            if (garageMap.has(m.name)) {
+                garageInfo = `<span class="garage-badge">已有</span><span class="garage-natures">${escapeHtml(garageMap.get(m.name).join('、'))}</span>`;
             }
             html += `<div style="display:flex; align-items:center; padding:6px 12px; border-bottom:1px solid #f0f0f0;">
                 <strong style="flex:1;">${escapeHtml(m.name)}</strong>
@@ -509,7 +504,7 @@
         let html = `<p style="padding:0.5rem 1rem; font-weight:bold;">${escapeHtml(groupName)}（${pets.length} 只）</p>`;
         pets.forEach(p => {
             let garageInfo = '';
-            if (garageMap.has(getPetBaseName(p))) {
+            if (garageMap.has(p)) {
                 garageInfo = `<span class="garage-badge">已有</span>`;
             }
             html += `<div style="display:inline-block; background:#e9f0e6; border-radius:40px; padding:6px 16px; margin:6px; font-size:0.85rem;">
