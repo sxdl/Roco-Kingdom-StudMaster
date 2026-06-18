@@ -282,7 +282,7 @@
 
     let allPetNames = [];
     let currentSelectedPet = null;
-    let selectedNature = null;
+    let selectedNatures = new Set();
     let dataReady = false;
 
     // 完整30种性格数据
@@ -346,21 +346,21 @@
         return map;
     }
 
-    function addToGarage(petName, nature) {
+    function addToGarage(petName, nature, silent) {
         let myPets = loadMyPets();
         if (myPets.some(p => p.name === petName && p.nature === nature)) {
-            alert(`"${petName} (${nature})" 已在仓库中`);
+            if (!silent) alert(`"${petName} (${nature})" 已在仓库中`);
             return false;
         }
         myPets.push({ name: petName, nature });
         saveMyPets(myPets);
-        alert(`✅ 已将 ${petName} (${nature}) 添加到种公仓库`);
+        if (!silent) alert(`✅ 已将 ${petName} (${nature}) 添加到种公仓库`);
         return true;
     }
 
     function showNatureSelector(petName) {
         currentSelectedPet = petName;
-        selectedNature = null;
+        selectedNatures.clear();
         modalPetNameSpan.innerHTML = `🐉 <strong>${escapeHtml(petName)}</strong>`;
         natureGrid.innerHTML = '';
         ALL_NATURES.forEach(nature => {
@@ -369,9 +369,13 @@
             div.textContent = nature;
             div.title = `${nature}：+${NATURE_INFO[nature].inc}  -${NATURE_INFO[nature].dec}`;
             div.addEventListener('click', () => {
-                document.querySelectorAll('.nature-option').forEach(opt => opt.classList.remove('selected'));
-                div.classList.add('selected');
-                selectedNature = nature;
+                if (selectedNatures.has(nature)) {
+                    selectedNatures.delete(nature);
+                    div.classList.remove('selected');
+                } else {
+                    selectedNatures.add(nature);
+                    div.classList.add('selected');
+                }
             });
             natureGrid.appendChild(div);
         });
@@ -379,9 +383,17 @@
     }
 
     confirmAddBtn.onclick = () => {
-        if (!selectedNature) { alert('请选择性格'); return; }
-        addToGarage(currentSelectedPet, selectedNature);
+        if (selectedNatures.size === 0) { alert('请至少选择一个性格'); return; }
+        let added = 0, skipped = 0;
+        for (const nature of selectedNatures) {
+            if (addToGarage(currentSelectedPet, nature, true)) added++;
+            else skipped++;
+        }
         modal.style.display = 'none';
+        let msg = `✅ 已将 ${currentSelectedPet}（${added} 个性格）添加到种公仓库`;
+        if (skipped > 0) msg += `，${skipped} 个性格已存在被跳过`;
+        alert(msg);
+        refreshGarageDisplay();
     };
     cancelAddBtn.onclick = () => { modal.style.display = 'none'; };
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
