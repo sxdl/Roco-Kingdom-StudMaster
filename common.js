@@ -75,18 +75,30 @@ function buildMappings() {
     }
     for (let g of allGroups) groupToPets.set(g, new Set());
 
+    // 提取基础名：去掉括号内的形态描述
+    // e.g. "鸭吉吉（蓬松的样子）" → "鸭吉吉"
+    function baseName(name) {
+        return name.replace(/[（(][^）)]*[）)]/g, '').trim();
+    }
+
     for (let item of eggDataList) {
         let name = (item.name || '').trim();
         if (!name) continue;
-        let lower = name.toLowerCase();
+        let base = baseName(name);
+        if (!base) continue;
+        let lower = base.toLowerCase();
         if (!petToGroups.has(lower)) {
-            petToGroups.set(lower, { id: item.id, name: name, groups: new Set() });
+            petToGroups.set(lower, { id: item.id, name: base, groups: new Set() });
         }
         let entry = petToGroups.get(lower);
         if (item.id && (!entry.id || item.id < entry.id)) entry.id = item.id;
+        // 优先使用不带括号的基础名作为显示名
+        if (!base.includes('（') && !base.includes('(')) {
+            entry.name = base;
+        }
         for (let g of (item.eggGroups || [])) {
             entry.groups.add(g);
-            if (groupToPets.has(g)) groupToPets.get(g).add(name);
+            if (groupToPets.has(g)) groupToPets.get(g).add(base);
         }
     }
 
