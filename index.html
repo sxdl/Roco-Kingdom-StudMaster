@@ -362,12 +362,19 @@
         currentSelectedPet = petName;
         selectedNatures.clear();
         modalPetNameSpan.innerHTML = `🐉 <strong>${escapeHtml(petName)}</strong>`;
+        // 预选已有性格
+        const garageMap = getGaragePetNaturesMap();
+        const existingNatures = garageMap.get(petName) || [];
         natureGrid.innerHTML = '';
         ALL_NATURES.forEach(nature => {
             const div = document.createElement('div');
             div.className = 'nature-option';
             div.textContent = nature;
             div.title = `${nature}：+${NATURE_INFO[nature].inc}  -${NATURE_INFO[nature].dec}`;
+            if (existingNatures.includes(nature)) {
+                div.classList.add('selected');
+                selectedNatures.add(nature);
+            }
             div.addEventListener('click', () => {
                 if (selectedNatures.has(nature)) {
                     selectedNatures.delete(nature);
@@ -442,8 +449,9 @@
                 html += `<span style="background:#88b04b; color:white; padding:4px 12px; border-radius:20px; margin:4px; display:inline-block; cursor:pointer;" onclick="showGroupPets('${escapeHtml(g)}')">${escapeHtml(g)}</span>`;
             }
         });
-        if (!inGarage && groups.some(g => g !== '无法孵蛋')) {
-            html += `<button class="add-to-garage-btn" onclick="showNatureSelector('${escapeHtml(petName)}')">➕ 添加到仓库</button>`;
+        if (groups.some(g => g !== '无法孵蛋')) {
+            const label = inGarage ? '➕ 添加更多性格' : '➕ 添加到仓库';
+            html += `<button class="add-to-garage-btn" onclick="showNatureSelector('${escapeHtml(petName)}')">${label}</button>`;
         }
         html += `</p>`;
         resultBadges.innerHTML = html;
