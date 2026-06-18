@@ -23,6 +23,26 @@
         .info-text { margin-top: 10px; text-align: center; font-size: 0.8rem; color: #6f7c64; }
         .data-status { text-align: center; font-size: 0.75rem; color: #6f7c64; padding: 4px; }
         .data-status.error { color: #d9534f; }
+        .filter-bar {
+            display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0;
+            align-items: center;
+        }
+        .filter-bar label { font-size: 0.9rem; font-weight: bold; color: #2b5e2f; }
+        .filter-chip {
+            display: inline-block; padding: 6px 14px; border-radius: 40px;
+            border: 1px solid #cbdcc2; background: white; cursor: pointer;
+            font-size: 0.85rem; transition: 0.15s; user-select: none;
+        }
+        .filter-chip:hover { background: #eef5e8; }
+        .filter-chip.active { background: #2b5e2f; color: white; border-color: #2b5e2f; }
+        .filter-actions {
+            display: flex; gap: 8px; margin-left: auto;
+        }
+        .filter-actions button {
+            padding: 6px 14px; border-radius: 40px; border: 1px solid #cbdcc2;
+            background: white; cursor: pointer; font-size: 0.85rem;
+        }
+        .filter-actions button:hover { background: #eef5e8; }
     </style>
 </head>
 <body>
@@ -34,6 +54,13 @@
     <p>⚡ 排序规则：<strong>可配种宠物总数</strong>越多越优质，同等条件下蛋组数量越多越优。</p>
     <p>📌 仅统计拥有 <strong>至少2个蛋组</strong> 的宠物（单蛋组不视为种公）。</p>
     <div id="dataStatus" class="data-status">⏳ 正在加载蛋组数据…</div>
+    <div class="filter-bar" id="filterBar" style="display:none;">
+        <label>🥚 蛋组筛选：</label>
+        <div id="filterChips"></div>
+        <div class="filter-actions">
+            <button id="clearFilterBtn" title="清除筛选">清除</button>
+        </div>
+    </div>
     <div class="nav-links">
         <a href="index.html">← 返回查询</a>
         <a href="stud-repo.html">📦 种公仓库</a>
@@ -89,34 +116,78 @@
         document.getElementById('dataStatus').textContent = `✅ 已加载 ${stats.totalPets} 只宠物 · 来源 BWIKI`;
         ranking = getStudRanking();
         dataReady = true;
-        renderTable();
+        initFilterChips();
+        filterAndRender();
     }).catch(err => {
         document.getElementById('dataStatus').className = 'data-status error';
         document.getElementById('dataStatus').innerHTML = `❌ 数据加载失败：${escapeHtml(err.message)} <a href="javascript:location.reload()" style="color:#2b5e2f;">重试</a>`;
     });
 
+    let selectedGroups = new Set();
+    let filteredRanking = [];
+
+    function initFilterChips() {
+        const container = document.getElementById('filterChips');
+        const groups = getAllEggGroups().filter(g => g !== '无法孵蛋');
+        document.getElementById('filterBar').style.display = 'flex';
+        groups.forEach(g => {
+            const chip = document.createElement('span');
+            chip.className = 'filter-chip';
+            chip.textContent = g;
+            chip.addEventListener('click', () => {
+                if (selectedGroups.has(g)) {
+                    selectedGroups.delete(g);
+                    chip.classList.remove('active');
+                } else {
+                    selectedGroups.add(g);
+                    chip.classList.add('active');
+                }
+                currentPage = 1;
+                filterAndRender();
+            });
+            container.appendChild(chip);
+        });
+        document.getElementById('clearFilterBtn').addEventListener('click', () => {
+            selectedGroups.clear();
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            currentPage = 1;
+            filterAndRender();
+        });
+    }
+
+    function filterAndRender() {
+        if (selectedGroups.size > 0) {
+            filteredRanking = ranking.filter(p => p.groups.some(g => selectedGroups.has(g)));
+        } else {
+            filteredRanking = ranking;
+        }
+        renderTable();
+    }
+
     function renderTable() {
         const tbody = document.getElementById('rankingBody');
-        if (!ranking.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">暂无符合条件（至少2个蛋组）的种公</td></tr>';
+        const data = filteredRanking;
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">暂无符合条件的种公</td></tr>';
             document.getElementById('paginationControls').style.display = 'none';
+            document.getElementById('rangeInfo').innerHTML = '';
             return;
         }
         document.getElementById('paginationControls').style.display = 'flex';
 
         let start = (currentPage - 1) * pageSize;
         let end = start + pageSize;
-        if (pageSize === 'all') { start = 0; end = ranking.length; }
+        if (pageSize === 'all') { start = 0; end = data.length; }
         else {
-            if (start >= ranking.length) {
-                currentPage = Math.max(1, Math.ceil(ranking.length / pageSize));
+            if (start >= data.length) {
+                currentPage = Math.max(1, Math.ceil(data.length / pageSize));
                 start = (currentPage - 1) * pageSize;
                 end = start + pageSize;
             }
-            if (end > ranking.length) end = ranking.length;
+            if (end > data.length) end = data.length;
         }
 
-        const pageData = ranking.slice(start, end);
+        const pageData = data.slice(start, end);
         let html = '';
         pageData.forEach((item, idx) => {
             const globalIndex = start + idx + 1;
@@ -137,12 +208,11 @@
             });
         });
 
-        updatePaginationInfo();
-        renderPageNumbers();
+        updatePaginationInfo(data.length);
+        renderPageNumbers(data.length);
     }
 
-    function updatePaginationInfo() {
-        let total = ranking.length;
+    function updatePaginationInfo(total) {
         if (pageSize === 'all') {
             document.getElementById('rangeInfo').innerHTML = `显示第 1 - ${total} 条，共 ${total} 条`;
             return;
@@ -152,9 +222,9 @@
         document.getElementById('rangeInfo').innerHTML = `显示第 ${start} - ${end} 条，共 ${total} 条`;
     }
 
-    function renderPageNumbers() {
+    function renderPageNumbers(total) {
         if (pageSize === 'all') { document.getElementById('pageNumbers').innerHTML = ''; return; }
-        totalPages = Math.ceil(ranking.length / pageSize);
+        totalPages = Math.ceil(total / pageSize);
         const container = document.getElementById('pageNumbers');
         container.innerHTML = '';
         let startPage = Math.max(1, currentPage - 3);
